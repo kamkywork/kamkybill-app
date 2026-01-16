@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบออกใบเสร็จรับเงิน - แอดวานซ์ (V.2.05 Clean)</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root { 
+            --paper-width: 210mm; 
+            --paper-height: 297mm; 
+        }
+
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- Layout Desktop --- */
+        .editor-panel { width: 35%; background: #ffffff; padding: 20px; padding-bottom: 50px; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; display: flex; flex-direction: column; }
+        .preview-panel { width: 65%; background: #525659; display: flex; justify-content: center; align-items: flex-start; padding: 20px; overflow: auto; }
+
+        /* --- Responsive Logic (Mobile/Tablet) --- */
+        @media screen and (max-width: 1024px) {
+            body { flex-direction: column; height: auto; overflow-y: auto; }
+            
+            .editor-panel { 
+                width: 100%; 
+                height: auto; 
+                order: 1; 
+                padding-bottom: 20px; /* ปรับกลับเป็นปกติเพราะไม่มีเมนูบังแล้ว */
+                box-sizing: border-box; 
+            }
+
+            .preview-panel { width: 100%; height: auto; order: 2; padding: 10px; background: #e9ecef; overflow-x: hidden; }
+            
+            /* ย่อกระดาษให้พอดีมือถือ */
+            .paper { transform: scale(0.45); transform-origin: top center; margin-bottom: -140mm; } 
+        }
+
+        @media screen and (min-width: 480px) and (max-width: 1024px) {
+             /* Tablet */
+            .paper { transform: scale(0.7); margin-bottom: -80mm; }
+        }
+
+        /* --- Editor Styling --- */
+        .editor-panel h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; font-size: 1.2rem; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 0.9rem; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
+        .form-group input:focus { border-color: #007bff; outline: none; }
+        .readonly-field { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
+        
+        .slip-preview { width: 100%; max-height: 150px; object-fit: contain; margin-top: 5px; border: 1px dashed #ccc; display: none; }
+
+        /* --- Buttons --- */
+        .bottom-action-wrapper { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; border: 1px solid #e9ecef; }
+        .action-popup { display: none; margin-bottom: 10px; }
+        .btn-action { width: 100%; border: none; padding: 12px; font-size: 1em; cursor: pointer; border-radius: 5px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; font-family: 'Sarabun', sans-serif; }
+        .btn-main { background-color: #2c3e50; font-weight: bold; }
+        .btn-sub-print { background-color: #28a745; }
+        .btn-sub-save { background-color: #ffc107; color: #333; }
+        .btn-sub-cloud { background-color: #4285F4; }
+        .btn-refresh, .btn-delete { border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; color: white; font-size: 0.8rem; margin-top: 5px;}
+        .btn-refresh { background-color: #17a2b8; }
+        .btn-delete { background-color: #dc3545; }
+
+        /* --- Paper CSS --- */
+        .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; }
+        
+        .header { position: relative; height: 50px; margin-bottom: 35px; }
+        .header-title { font-size: 24pt; font-weight: bold; position: absolute; left: 0; width: 100%; text-align: center; top: 5px; z-index: 1; }
+        .header-meta { text-align: right; line-height: 1.5; position: absolute; right: 0; top: 0; z-index: 2; background: rgba(255,255,255,0.8); }
+        #out-contract-no, #out-book, #out-no { color: red; font-weight: bold; }
+        .security-ref { font-family: 'Courier Prime', monospace; font-size: 9pt; color: #666; text-align: right; margin-bottom: 10px; letter-spacing: 1px; }
+
+        .row { display: flex; margin-bottom: 12px; align-items: flex-end; min-height: 30px; flex-wrap: nowrap; }
+        .fixed-width-row { width: 70%; }
+        .label { white-space: nowrap; margin-right: 5px; flex-shrink: 0; padding-bottom: 2px; }
+        
+        /* จัดกึ่งกลางข้อความ */
+        .fill-line { border-bottom: 1px solid #000; flex-grow: 1; min-width: 0; text-align: center; padding: 0 5px; white-space: nowrap; overflow: visible; font-weight: bold; color: #000; }
+        
+        .checkbox-group { display: flex; align-items: center; margin-right: 15px; flex-shrink: 0; }
+        .box { width: 15px; height: 15px; border: 1px solid black; display: inline-block; margin-right: 5px; text-align: center; line-height: 12px; font-size: 12px; }
+
+        /* Signature & Slip */
+        .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; }
+        .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; }
+        .slip-on-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
+        .signature-box { text-align: center; width: 35%; position: relative; margin-left: auto; }
+        .uploaded-sig { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); max-width: 150px; max-height: 80px; mix-blend-mode: multiply; display: none; z-index: 5; }
+
+        .footer-wrapper { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .footer-text { width: 100%; font-size: 12pt; line-height: 1.6; color: #333; }
+        .warning-box { margin-top: 20px; margin-bottom: 15px; font-weight: bold; color: red; border: 3px solid red; padding: 10px; justify-content: center; border-radius: 8px; }
+
+        @page { size: A4 portrait; margin: 0; }
+        @media print {
+            body { background: white; height: auto; display: block; overflow: visible; }
+            .editor-panel { display: none; }
+            .preview-panel { width: 100%; padding: 0; display: block; background: white; }
+            .paper { box-shadow: none; margin: 0; width: 100%; padding: 0; min-height: 100%; page-break-after: always; transform: none !important; }
+            .slip-on-paper-container { border: 1px solid #000 !important; -webkit-print-color-adjust: exact; } 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="editor-panel">
+        <h2>กรอกข้อมูลใบเสร็จ</h2>
+        
+        <div class="form-group">
+            <label>รหัสอ้างอิง (Auto)</label>
+            <input type="text" id="in-security-ref" class="readonly-field" readonly>
+            <button class="btn-refresh" onclick="generateSecurityCode()">↻ สุ่มใหม่</button>
+        </div>
+
+        <div class="form-group">
+            <label>วันที่ (เลขชุดเปลี่ยนตามเดือนปี)</label>
+            <input type="date" id="in-date" oninput="saveHistory(); handleDateChange(this.value)">
+        </div>
+
+        <div class="form-group">
+            <label>สัญญาเลขที่ (Contract No.)</label>
+            <input type="text" id="in-contract-no" value="" placeholder="เช่น 66001" oninput="saveHistory(); sync('contract-no')">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <div class="form-group" style="width: 50%;">
+                <label>ชุดที่ (Auto)</label>
+                <input type="text" id="in-book" class="readonly-field" readonly>
+            </div>
+            <div class="form-group" style="width: 50%;">
+                <label>เลขที่ใบเสร็จ (Auto Run)</label>
+                <div style="display:flex; gap:5px;">
+                     <input type="text" id="in-no" value="0001" oninput="saveHistory(); sync('no')">
+                     <button class="btn-refresh" onclick="fetchNextBillNo()" title="โหลดเลขล่าสุดจาก Drive">↻</button>
+                </div>
+            </div>
+        </div>
+        
+        <hr>
+        <div class="form-group">
+            <label>ชื่อร้านค้าตัวแทน</label>
+            <input type="text" id="in-shop-name" oninput="saveHistory(); sync('shop-name')">
+        </div>
+        <div class="form-group">
+            <label>เบอร์โทรเซลล์</label>
+            <input type="text" id="in-shop-phone" oninput="saveHistory(); formatPhone(this)">
+        </div>
+        <hr>
+        
+        <div class="form-group">
+            <label>ได้รับเงินจาก (ลูกค้า)</label>
+            <input type="text" id="in-customer" oninput="saveHistory(); sync('customer')">
+        </div>
+        <div class="form-group">
+            <label>ประเภทการชำระ</label>
+            <select id="in-type" onchange="saveHistory(); toggleType()">
+                <option value="">-- เลือก --</option>
+                <option value="contract">วันทำสัญญาซื้อ</option>
+                <option value="installment">ค่างวด</option>
+            </select>
+        </div>
+        <div class="form-group" id="group-installment" style="display:none;">
+            <label>งวดที่</label>
+            <input type="text" id="in-period" oninput="saveHistory(); sync('period')">
+        </div>
+        
+        <div class="form-group">
+            <label>จำนวนเงิน (บาท)</label>
+            <input type="text" id="in-amount" oninput="saveHistory(); formatMoney(this)">
+        </div>
+
+        <div class="form-group" style="background: #e8f0fe; padding: 10px; border-radius: 5px; border: 1px solid #b3d7ff;">
+            <label style="color: #004085;">📎 แนบรูปสลิป</label>
+            <input type="file" id="in-slip-file" accept="image/*" onchange="previewSlip(this)">
+            <img id="slip-preview-img" class="slip-preview">
+        </div>
+        
+        <hr>
+        <h3>ส่วนยอดคงเหลือ</h3>
+        <div class="form-group">
+            <label>จำนวนงวดคงเหลือ (งวด)</label>
+            <input type="text" id="in-rem-month" oninput="saveHistory(); sync('rem-month')">
+        </div>
+        <div class="form-group">
+            <label>งวดละ (บาท)</label>
+            <input type="text" id="in-rem-amount" oninput="saveHistory(); formatMoney(this)">
+        </div>
+        <div class="form-group">
+            <label>ชำระทุกวันที่</label>
+            <input type="text" id="in-due-date" oninput="saveHistory(); sync('due-date')">
+        </div>
+        <div class="form-group">
+            <label>เริ่มชำระงวดแรก</label>
+            <input type="date" id="in-start-date" oninput="saveHistory(); formatStartDate(this.value)">
+        </div>
+        <hr>
+        <div class="form-group">
+            <label>ผู้รับเงิน</label>
+            <input type="text" id="in-receiver" oninput="saveHistory(); sync('receiver')" placeholder="พิมพ์ชื่อ...">
+            <div style="margin-top: 10px;">
+                <input type="file" id="in-sig-file" accept="image/*" onchange="handleSignatureUpload(this)">
+                <button class="btn-delete" onclick="removeSignature()">ลบรูปลายเซ็น</button>
+            </div>
+        </div>
+
+        <div class="bottom-action-wrapper">
+            <div id="action-popup" class="action-popup">
+                <button class="btn-action btn-sub-print" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
+                <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (JPG)</button>
+                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกข้อมูลขึ้น Drive</button>
+                
+                </div>
+            <button class="btn-action btn-main" onclick="toggleActionPopup()">🚀 จัดการเอกสาร</button>
+        </div>
+    </div>
+
+    <div class="preview-panel">
+        <div class="paper" id="bill-paper">
+            <div class="security-ref">REF ID: <span id="out-security-ref"></span></div>
+
+            <div class="header">
+                <div class="header-title">แอดวานซ์</div>
+                <div class="header-meta">
+                    <div>สัญญาเลขที่ <span id="out-contract-no"></span></div>
+                    <div>ชุดที่ <span id="out-book"></span></div>
+                    <div>เลขที่ <span id="out-no">0001</span></div>
+                </div>
+            </div>
+
+            <div class="row fixed-width-row">
+                <span class="label">ชื่อร้านค้าตัวแทน</span>
+                <span class="fill-line" id="out-shop-name"></span>
+            </div>
+            <div class="row fixed-width-row">
+                <span class="label">เบอร์โทรเซลล์</span>
+                <span class="fill-line" id="out-shop-phone"></span>
+            </div>
+
+            <div style="text-align: center; font-size: 20pt; font-weight: bold; margin: 10px 0;">ใบเสร็จรับเงิน</div>
+
+            <div class="row" style="justify-content: flex-end;">
+                <span class="label">วันที่</span>
+                <span class="fill-line" id="out-date" style="flex-grow: 0; min-width: 150px;"></span>
+            </div>
+
+            <div class="row">
+                <span class="label">ได้รับเงินจาก</span>
+                <span class="fill-line" id="out-customer"></span>
+            </div>
+
+            <div class="row">
+                <span class="label">ชำระค่า</span>
+                <div class="checkbox-group">
+                    <div class="box" id="box-contract"></div>
+                    <span>วันทำสัญญาซื้อ</span>
+                </div>
+                <div class="checkbox-group" style="margin-left: 20px;">
+                    <div class="box" id="box-installment"></div>
+                    <span>ค่างวด งวดที่</span>
+                </div>
+                <span class="fill-line" id="out-period"></span>
+            </div>
+
+            <div class="row">
+                <span class="label">จำนวนเงิน</span>
+                <span class="fill-line" id="out-amount"></span>
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 10px;">
+                <div class="row">
+                    <span class="label">จำนวนงวดคงเหลือ</span>
+                    <span class="fill-line" id="out-rem-month"></span>
+                    <span class="label">งวด</span>
+                    <span class="label" style="margin-left: 10px;">งวดละ</span>
+                    <span class="fill-line" id="out-rem-amount"></span>
+                    <span class="label">บาท</span>
+                </div>
+                <div class="row">
+                    <span class="label">ชำระทุกวันที่</span>
+                    <span class="fill-line" id="out-due-date"></span>
+                    <span class="label">เริ่มชำระงวดแรก</span>
+                    <span class="fill-line" id="out-start-date"></span>
+                </div>
+            </div>
+
+            <div class="row warning-box">* ให้นำใบเสร็จรับเงินมาด้วยทุกครั้ง *</div>
+
+            <div class="signature-section">
+                <div id="slip-container-paper" class="slip-on-paper-container">
+                    <div class="slip-label" style="width:100%; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">หลักฐานการชำระเงิน</div>
+                    <img id="out-slip-img-paper" class="slip-on-paper-img">
+                </div>
+                <div class="signature-box">
+                    <img id="out-sig-img" class="uploaded-sig">
+                    <div style="height: 50px;"></div> 
+                    <div class="row">
+                        <span class="label">ลงชื่อ</span>
+                        <span class="fill-line" id="out-receiver" style="z-index: 1; position: relative;"></span>
+                    </div>
+                    <div>ผู้รับเงิน</div>
+                </div>
+            </div>
+
+            <div class="footer-wrapper">
+                <div class="footer-text">
+                    <strong>หมายเหตุ:</strong> กรณีชำระล่าช้า หรือ ย้ายที่อยู่ กรุณาโทรแจ้ง หรือแอดไลน์เซลส์ที่เบอร์ 081-909-7919<br>
+                    <small>โปรดเก็บใบนี้ไว้เป็นหลักฐานเพื่อตรวจสอบ รายละเอียดวิธีชำระค่างวดด้านหลังบิล</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // *** CONFIGURATION ***
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbxvSVBR91kw7gF_8Mng6tpPmsIORER9goOAb5FQhCx4nfvJ4RxBFKGVWc7ImTWrNHH91g/exec"; 
+
+        // --- Core Functions ---
+        function toggleActionPopup() {
+            const popup = document.getElementById('action-popup');
+            popup.style.display = (popup.style.display === 'block') ? 'none' : 'block';
+            if(popup.style.display === 'block') popup.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- Auto Run Number Logic ---
+        function fetchNextBillNo() {
+            const book = document.getElementById('in-book').value;
+            if(!book) return;
+            
+            const btn = document.querySelector('.btn-refresh');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "...";
+            
+            fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`)
+                .then(response => response.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        document.getElementById('in-no').value = data.nextNo;
+                        sync('no');
+                    }
+                    btn.innerHTML = originalText;
+                })
+                .catch(err => {
+                    console.error("Fetch Error:", err);
+                    btn.innerHTML = originalText;
+                });
+        }
+
+        function handleDateChange(dateStr) { 
+            formatDate(dateStr); 
+            updateSetNumber(dateStr); 
+        }
+
+        function updateSetNumber(dateStr) {
+            if (!dateStr) return;
+            const date = new Date(dateStr); 
+            const yearBE = date.getFullYear() + 543;
+            const shortYear = yearBE.toString().slice(-2); 
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const setNumber = shortYear + month;
+            
+            const oldBook = document.getElementById('in-book').value;
+            document.getElementById('in-book').value = setNumber; 
+            document.getElementById('out-book').innerText = setNumber;
+
+            if(oldBook !== setNumber) {
+                fetchNextBillNo();
+            }
+        }
+
+        // --- Submit Logic ---
+        function submitToDatabase() {
+            if (!googleScriptUrl) { alert("กรุณาตั้งค่า Google Script URL"); return; }
+            
+            const btn = document.querySelector('.btn-sub-cloud');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "⏳ กำลังบันทึก...";
+            btn.disabled = true;
+
+            const slipContainer = document.getElementById('slip-container-paper');
+            const originalDisplay = slipContainer.style.display;
+            slipContainer.style.display = 'none';
+
+            html2canvas(document.getElementById("bill-paper"), { scale: 2, useCORS: true }).then(canvas => {
+                slipContainer.style.display = originalDisplay; 
+                const receiptJpg = canvas.toDataURL("image/jpeg", 0.8).split(',')[1];
+                
+                const payload = {
+                    action: 'saveData',
+                    book: document.getElementById('in-book').value,
+                    no: document.getElementById('in-no').value,
+                    contractNo: document.getElementById('in-contract-no').value,
+                    period: document.getElementById('in-period').value || "-",
+                    amount: document.getElementById('in-amount').value,
+                    ref: document.getElementById('in-security-ref').value,
+                    receiptImage: receiptJpg,
+                    slipImage: "" 
+                };
+
+                const slipInput = document.getElementById('in-slip-file');
+                if (slipInput.files.length > 0) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        payload.slipImage = e.target.result.split(',')[1];
+                        sendData(payload, btn, originalText);
+                    };
+                    reader.readAsDataURL(slipInput.files[0]);
+                } else {
+                    sendData(payload, btn, originalText);
+                }
+            }).catch(err => {
+                alert('Error: ' + err);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        function sendData(payload, btn, originalText) {
+            fetch(googleScriptUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                alert('✅ บันทึกเรียบร้อย!');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }).catch(err => {
+                alert('❌ ผิดพลาด: ' + err);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        // --- Helper Functions ---
+        function previewSlip(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('slip-preview-img').src = e.target.result;
+                    document.getElementById('slip-preview-img').style.display = 'block';
+                    document.getElementById('out-slip-img-paper').src = e.target.result;
+                    document.getElementById('slip-container-paper').style.display = 'flex';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        function saveAsImage() {
+            html2canvas(document.getElementById("bill-paper"), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
+                link.href = canvas.toDataURL("image/jpeg", 0.9);
+                link.click();
+            });
+        }
+        function handleSignatureUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => { 
+                    document.getElementById('out-sig-img').src = e.target.result; 
+                    document.getElementById('out-sig-img').style.display = 'block'; 
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        function removeSignature() {
+            document.getElementById('out-sig-img').style.display = 'none';
+            document.getElementById('in-sig-file').value = '';
+        }
+        function sync(id) { document.getElementById('out-' + id).innerText = document.getElementById('in-' + id).value; }
+        function formatDate(dateStr) {
+            if(!dateStr) return;
+            const date = new Date(dateStr);
+            document.getElementById('out-date').innerText = date.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        function formatStartDate(dateStr) {
+            if(!dateStr) return;
+            document.getElementById('out-start-date').innerText = new Date(dateStr).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        function formatPhone(input) {
+            let val = input.value.replace(/\D/g, '');
+            if(val.length === 10) input.value = val.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
+            document.getElementById('out-shop-phone').innerText = input.value;
+        }
+        function formatMoney(input) {
+            let val = input.value.replace(/[^0-9.]/g, '');
+            const parts = val.split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            input.value = parts.join('.');
+            let out = input.value + (parts.length === 1 || parts[1] === "" ? ".-" : "");
+            
+            if(input.id === 'in-amount') {
+                out += " บาท (" + ThaiNumberToText(val) + ")";
+            }
+            
+            document.getElementById('out-' + input.id.replace('in-', '')).innerText = out;
+        }
+
+        function ThaiNumberToText(number) {
+            number = parseFloat(number.replace(/,/g, ''));
+            if (isNaN(number)) return "";
+            
+            const thaiNum = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+            const unit = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
+            
+            let bahtText = "";
+            let sNumber = number.toFixed(2).split('.');
+            let baht = sNumber[0];
+            let satang = sNumber[1];
+            
+            if (parseInt(baht) === 0 && parseInt(satang) === 0) return "ศูนย์บาทถ้วน";
+            
+            if (parseInt(baht) > 0) {
+                let len = baht.length;
+                for (let i = 0; i < len; i++) {
+                    let n = baht.charAt(i);
+                    if (n !== '0') {
+                        if ((i === (len - 1)) && (n === '1')) {
+                            bahtText += (bahtText.length === 0) ? thaiNum[1] : 'เอ็ด';
+                        } else if ((i === (len - 2)) && (n === '2')) {
+                            bahtText += 'ยี่';
+                        } else if ((i === (len - 2)) && (n === '1')) {
+                            bahtText += '';
+                        } else {
+                            bahtText += thaiNum[parseInt(n)];
+                        }
+                        bahtText += unit[len - i - 1];
+                    }
+                }
+                bahtText += 'บาท';
+            }
+            
+            if (parseInt(satang) > 0) {
+                let len = satang.length;
+                for (let i = 0; i < len; i++) {
+                    let n = satang.charAt(i);
+                    if (n !== '0') {
+                        if ((i === (len - 1)) && (n === '1') && (satang.charAt(0) !== '0')) {
+                            bahtText += 'เอ็ด';
+                        } else if ((i === (len - 2)) && (n === '2')) {
+                            bahtText += 'ยี่';
+                        } else if ((i === (len - 2)) && (n === '1')) {
+                            bahtText += '';
+                        } else {
+                            bahtText += thaiNum[parseInt(n)];
+                        }
+                        bahtText += (len - i - 1 === 1) ? 'สิบ' : '';
+                    }
+                }
+                bahtText += 'สตางค์';
+            } else {
+                bahtText += 'ถ้วน';
+            }
+            
+            return bahtText;
+        }
+
+        function generateSecurityCode() {
+            document.getElementById('in-security-ref').value = "TRX" + Math.random().toString(36).substr(2, 9).toUpperCase();
+            sync('security-ref');
+        }
+        function toggleType() {
+            const type = document.getElementById('in-type').value;
+            document.getElementById('box-contract').innerText = (type === 'contract') ? "✓" : "";
+            document.getElementById('box-installment').innerText = (type === 'installment') ? "✓" : "";
+            document.getElementById('group-installment').style.display = (type === 'installment') ? 'block' : 'none';
+        }
+        
+        // --- SPEECH & HISTORY LOGIC (Functions kept but UI removed) ---
+        // (ส่วนนี้ยังเก็บไว้เผื่ออนาคตต้องการดึงกลับมาใช้ แต่จะไม่มีปุ่มให้กด)
+        var recognition;
+        var lastFocusedInput = null;
+
+        function initSpeech() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'th-TH';
+
+                recognition.onresult = function(event) {
+                    var transcript = event.results[0][0].transcript;
+                    if (lastFocusedInput) {
+                        lastFocusedInput.value = transcript;
+                        lastFocusedInput.dispatchEvent(new Event('input'));
+                    }
+                };
+            }
+        }
+        function toggleSpeech() {
+            if (!recognition) initSpeech();
+            if (recognition) recognition.start();
+        }
+
+        // --- HISTORY (Undo/Redo) ---
+        let historyStack = [];
+        let historyIndex = -1;
+        const maxHistory = 50;
+
+        function saveHistory() {
+            const currentState = {};
+            document.querySelectorAll('input:not([type="file"]), select').forEach(el => {
+                currentState[el.id] = el.value;
+            });
+            if (historyIndex < historyStack.length - 1) {
+                historyStack = historyStack.slice(0, historyIndex + 1);
+            }
+            historyStack.push(JSON.stringify(currentState));
+            if (historyStack.length > maxHistory) historyStack.shift();
+            else historyIndex++;
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                restoreState(historyStack[historyIndex]);
+            }
+        }
+
+        function redo() {
+            if (historyIndex < historyStack.length - 1) {
+                historyIndex++;
+                restoreState(historyStack[historyIndex]);
+            }
+        }
+
+        function restoreState(jsonState) {
+            const state = JSON.parse(jsonState);
+            for (const id in state) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = state[id];
+                    if (el.tagName === 'SELECT') el.dispatchEvent(new Event('change'));
+                    else el.dispatchEvent(new Event('input')); 
+                }
+            }
+        }
+
+        function clearData() {
+            if(confirm('ต้องการล้างข้อมูลทั้งหมดใช่หรือไม่?')) {
+                document.querySelectorAll('input:not(.readonly-field), select').forEach(el => {
+                   if(el.type !== 'button') el.value = '';
+                });
+                document.getElementById('in-type').value = "";
+                toggleType();
+                generateSecurityCode();
+                removeSignature();
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('in-date').value = today;
+                handleDateChange(today);
+                document.getElementById('in-slip-file').value = '';
+                document.getElementById('slip-preview-img').style.display = 'none';
+                document.getElementById('slip-container-paper').style.display = 'none';
+                historyStack = [];
+                historyIndex = -1;
+                saveHistory(); 
+            }
+        }
+        
+        // --- Init ---
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('in-date').value = today;
+            handleDateChange(today);
+            generateSecurityCode();
+            setTimeout(fetchNextBillNo, 1000);
+
+            document.querySelectorAll('input, select').forEach(el => {
+                el.addEventListener('focus', function() {
+                    lastFocusedInput = this;
+                });
+            });
+
+            saveHistory();
+        }
+    </script>
+</body>
+</html>
