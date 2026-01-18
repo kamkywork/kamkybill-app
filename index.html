@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน - แอดวานซ์ (V.2.05 Clean)</title>
+    <title>ระบบออกใบเสร็จรับเงิน - แอดวานซ์ (V.Final Modified)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -20,26 +20,15 @@
         .editor-panel { width: 35%; background: #ffffff; padding: 20px; padding-bottom: 50px; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; display: flex; flex-direction: column; }
         .preview-panel { width: 65%; background: #525659; display: flex; justify-content: center; align-items: flex-start; padding: 20px; overflow: auto; }
 
-        /* --- Responsive Logic (Mobile/Tablet) --- */
+        /* --- Responsive Logic --- */
         @media screen and (max-width: 1024px) {
             body { flex-direction: column; height: auto; overflow-y: auto; }
-            
-            .editor-panel { 
-                width: 100%; 
-                height: auto; 
-                order: 1; 
-                padding-bottom: 20px; /* ปรับกลับเป็นปกติเพราะไม่มีเมนูบังแล้ว */
-                box-sizing: border-box; 
-            }
-
+            .editor-panel { width: 100%; height: auto; order: 1; padding-bottom: 20px; box-sizing: border-box; }
             .preview-panel { width: 100%; height: auto; order: 2; padding: 10px; background: #e9ecef; overflow-x: hidden; }
-            
-            /* ย่อกระดาษให้พอดีมือถือ */
             .paper { transform: scale(0.45); transform-origin: top center; margin-bottom: -140mm; } 
         }
 
         @media screen and (min-width: 480px) and (max-width: 1024px) {
-             /* Tablet */
             .paper { transform: scale(0.7); margin-bottom: -80mm; }
         }
 
@@ -66,7 +55,7 @@
         .btn-delete { background-color: #dc3545; }
 
         /* --- Paper CSS --- */
-        .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; }
+        .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; transition: all 0.3s; }
         
         .header { position: relative; height: 50px; margin-bottom: 35px; }
         .header-title { font-size: 24pt; font-weight: bold; position: absolute; left: 0; width: 100%; text-align: center; top: 5px; z-index: 1; }
@@ -78,14 +67,13 @@
         .fixed-width-row { width: 70%; }
         .label { white-space: nowrap; margin-right: 5px; flex-shrink: 0; padding-bottom: 2px; }
         
-        /* จัดกึ่งกลางข้อความ */
         .fill-line { border-bottom: 1px solid #000; flex-grow: 1; min-width: 0; text-align: center; padding: 0 5px; white-space: nowrap; overflow: visible; font-weight: bold; color: #000; }
         
         .checkbox-group { display: flex; align-items: center; margin-right: 15px; flex-shrink: 0; }
         .box { width: 15px; height: 15px; border: 1px solid black; display: inline-block; margin-right: 5px; text-align: center; line-height: 12px; font-size: 12px; }
 
         /* Signature & Slip */
-        .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; }
+        .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; transition: all 0.3s; }
         .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; }
         .slip-on-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
         .signature-box { text-align: center; width: 35%; position: relative; margin-left: auto; }
@@ -94,6 +82,28 @@
         .footer-wrapper { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
         .footer-text { width: 100%; font-size: 12pt; line-height: 1.6; color: #333; }
         .warning-box { margin-top: 20px; margin-bottom: 15px; font-weight: bold; color: red; border: 3px solid red; padding: 10px; justify-content: center; border-radius: 8px; }
+
+        /* --- Compact Mode CSS (สำหรับบันทึกรูปแบบย่อ) --- */
+        .paper.compact-mode {
+            min-height: auto !important; /* ปลดล็อคความสูง A4 ให้สั้นเท่าเนื้อหา */
+            height: auto !important;
+            padding-bottom: 20px !important;
+        }
+        
+        /* ลดระยะห่างคำเตือนกับลายเซ็น (เหลือประมาณ 2 บรรทัด) */
+        .paper.compact-mode .warning-box {
+            margin-bottom: 40px !important; /* ระยะห่างลงมาหาลายเซ็น */
+        }
+        .paper.compact-mode .signature-section {
+            margin-top: 0 !important; /* ลบ margin เดิมออก */
+            height: 130px !important; /* ลดความสูงลงเพราะไม่มีสลิป */
+        }
+        
+        /* ลดระยะห่างผู้รับเงินกับ Footer (เหลือ 1 บรรทัด) */
+        .paper.compact-mode .footer-wrapper {
+            margin-top: 20px !important; /* ระยะห่างจากลายเซ็นมาหา Footer */
+            padding-top: 0 !important;
+        }
 
         @page { size: A4 portrait; margin: 0; }
         @media print {
@@ -155,6 +165,12 @@
             <label>ได้รับเงินจาก (ลูกค้า)</label>
             <input type="text" id="in-customer" oninput="saveHistory(); sync('customer')">
         </div>
+
+        <div class="form-group">
+            <label>ชื่อสินค้า</label>
+            <input type="text" id="in-product-name" oninput="saveHistory(); sync('product-name')" placeholder="ระบุชื่อสินค้า...">
+        </div>
+
         <div class="form-group">
             <label>ประเภทการชำระ</label>
             <select id="in-type" onchange="saveHistory(); toggleType()">
@@ -210,8 +226,8 @@
         <div class="bottom-action-wrapper">
             <div id="action-popup" class="action-popup">
                 <button class="btn-action btn-sub-print" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
-                <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (JPG)</button>
-                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกข้อมูลขึ้น Drive</button>
+                <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (ไม่มีสลิป/ย่อ)</button>
+                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกขึ้น Drive (มีสลิป)</button>
                 
                 </div>
             <button class="btn-action btn-main" onclick="toggleActionPopup()">🚀 จัดการเอกสาร</button>
@@ -253,16 +269,17 @@
             </div>
 
             <div class="row">
-                <span class="label">ชำระค่า</span>
-                <div class="checkbox-group">
+                <span class="label">ชำระค่าสินค้า</span>
+                <span class="fill-line" id="out-product-name" style="width: 30%; flex-grow: 1;"></span>
+                <div class="checkbox-group" style="margin-left: 10px;">
                     <div class="box" id="box-contract"></div>
                     <span>วันทำสัญญาซื้อ</span>
                 </div>
-                <div class="checkbox-group" style="margin-left: 20px;">
+                <div class="checkbox-group" style="margin-left: 10px;">
                     <div class="box" id="box-installment"></div>
                     <span>ค่างวด งวดที่</span>
                 </div>
-                <span class="fill-line" id="out-period"></span>
+                <span class="fill-line" id="out-period" style="width: 50px; flex-grow: 0;"></span>
             </div>
 
             <div class="row">
@@ -371,7 +388,7 @@
             }
         }
 
-        // --- Submit Logic ---
+        // --- Submit Logic (Cloud - With Slip Evidence) ---
         function submitToDatabase() {
             if (!googleScriptUrl) { alert("กรุณาตั้งค่า Google Script URL"); return; }
             
@@ -380,12 +397,10 @@
             btn.innerHTML = "⏳ กำลังบันทึก...";
             btn.disabled = true;
 
-            const slipContainer = document.getElementById('slip-container-paper');
-            const originalDisplay = slipContainer.style.display;
-            slipContainer.style.display = 'none';
+            // แก้ไข: ไม่ซ่อนสลิปแล้ว เพราะต้องการให้ใบเสร็จที่มีหลักฐานการชำระเงินอัพขึ้นไดรฟ์
+            // ระยะบรรทัด: คงเดิม ไม่ใช้ Compact mode
 
             html2canvas(document.getElementById("bill-paper"), { scale: 2, useCORS: true }).then(canvas => {
-                slipContainer.style.display = originalDisplay; 
                 const receiptJpg = canvas.toDataURL("image/jpeg", 0.8).split(',')[1];
                 
                 const payload = {
@@ -395,6 +410,7 @@
                     contractNo: document.getElementById('in-contract-no').value,
                     period: document.getElementById('in-period').value || "-",
                     amount: document.getElementById('in-amount').value,
+                    product: document.getElementById('in-product-name').value, // เพิ่มฟิลด์สินค้า
                     ref: document.getElementById('in-security-ref').value,
                     receiptImage: receiptJpg,
                     slipImage: "" 
@@ -425,13 +441,37 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).then(() => {
-                alert('✅ บันทึกเรียบร้อย!');
+                alert('✅ บันทึกและอัพโหลดเรียบร้อย!');
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }).catch(err => {
                 alert('❌ ผิดพลาด: ' + err);
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+            });
+        }
+
+        // --- Save Local (Image - Compact Mode / No Slip) ---
+        function saveAsImage() {
+            const paper = document.getElementById("bill-paper");
+            const slipContainer = document.getElementById('slip-container-paper');
+            const originalDisplay = slipContainer.style.display;
+
+            // 1. ซ่อนสลิป (ตามโจทย์: ใบเสร็จที่ไม่มีภาพหลักฐานมาอยู่ในเมนูบันทึกภาพ)
+            slipContainer.style.display = 'none';
+            
+            // 2. ปรับระยะบรรทัด (Compact Mode)
+            paper.classList.add('compact-mode');
+
+            html2canvas(paper, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
+                link.href = canvas.toDataURL("image/jpeg", 0.9);
+                link.click();
+
+                // 3. คืนค่าเดิม
+                slipContainer.style.display = originalDisplay;
+                paper.classList.remove('compact-mode');
             });
         }
 
@@ -448,14 +488,7 @@
                 reader.readAsDataURL(input.files[0]);
             }
         }
-        function saveAsImage() {
-            html2canvas(document.getElementById("bill-paper"), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
-                link.href = canvas.toDataURL("image/jpeg", 0.9);
-                link.click();
-            });
-        }
+
         function handleSignatureUpload(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
@@ -568,32 +601,6 @@
             document.getElementById('box-installment').innerText = (type === 'installment') ? "✓" : "";
             document.getElementById('group-installment').style.display = (type === 'installment') ? 'block' : 'none';
         }
-        
-        // --- SPEECH & HISTORY LOGIC (Functions kept but UI removed) ---
-        // (ส่วนนี้ยังเก็บไว้เผื่ออนาคตต้องการดึงกลับมาใช้ แต่จะไม่มีปุ่มให้กด)
-        var recognition;
-        var lastFocusedInput = null;
-
-        function initSpeech() {
-            if ('webkitSpeechRecognition' in window) {
-                recognition = new webkitSpeechRecognition();
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                recognition.lang = 'th-TH';
-
-                recognition.onresult = function(event) {
-                    var transcript = event.results[0][0].transcript;
-                    if (lastFocusedInput) {
-                        lastFocusedInput.value = transcript;
-                        lastFocusedInput.dispatchEvent(new Event('input'));
-                    }
-                };
-            }
-        }
-        function toggleSpeech() {
-            if (!recognition) initSpeech();
-            if (recognition) recognition.start();
-        }
 
         // --- HISTORY (Undo/Redo) ---
         let historyStack = [];
@@ -612,53 +619,6 @@
             if (historyStack.length > maxHistory) historyStack.shift();
             else historyIndex++;
         }
-
-        function undo() {
-            if (historyIndex > 0) {
-                historyIndex--;
-                restoreState(historyStack[historyIndex]);
-            }
-        }
-
-        function redo() {
-            if (historyIndex < historyStack.length - 1) {
-                historyIndex++;
-                restoreState(historyStack[historyIndex]);
-            }
-        }
-
-        function restoreState(jsonState) {
-            const state = JSON.parse(jsonState);
-            for (const id in state) {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.value = state[id];
-                    if (el.tagName === 'SELECT') el.dispatchEvent(new Event('change'));
-                    else el.dispatchEvent(new Event('input')); 
-                }
-            }
-        }
-
-        function clearData() {
-            if(confirm('ต้องการล้างข้อมูลทั้งหมดใช่หรือไม่?')) {
-                document.querySelectorAll('input:not(.readonly-field), select').forEach(el => {
-                   if(el.type !== 'button') el.value = '';
-                });
-                document.getElementById('in-type').value = "";
-                toggleType();
-                generateSecurityCode();
-                removeSignature();
-                const today = new Date().toISOString().split('T')[0];
-                document.getElementById('in-date').value = today;
-                handleDateChange(today);
-                document.getElementById('in-slip-file').value = '';
-                document.getElementById('slip-preview-img').style.display = 'none';
-                document.getElementById('slip-container-paper').style.display = 'none';
-                historyStack = [];
-                historyIndex = -1;
-                saveHistory(); 
-            }
-        }
         
         // --- Init ---
         window.onload = function() {
@@ -667,13 +627,6 @@
             handleDateChange(today);
             generateSecurityCode();
             setTimeout(fetchNextBillNo, 1000);
-
-            document.querySelectorAll('input, select').forEach(el => {
-                el.addEventListener('focus', function() {
-                    lastFocusedInput = this;
-                });
-            });
-
             saveHistory();
         }
     </script>
