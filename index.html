@@ -3,46 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน - แอดวานซ์ (V.Final Modified)</title>
+    <title>ระบบออกใบเสร็จรับเงิน (Original Look + Smart Data)</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        :root { 
-            --paper-width: 210mm; 
-            --paper-height: 297mm; 
-        }
-
+        /* --- CSS ตามไฟล์ต้นฉบับ 100% --- */
+        :root { --paper-width: 210mm; --paper-height: 297mm; }
         body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-
-        /* --- Layout Desktop --- */
         .editor-panel { width: 35%; background: #ffffff; padding: 20px; padding-bottom: 50px; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; display: flex; flex-direction: column; }
         .preview-panel { width: 65%; background: #525659; display: flex; justify-content: center; align-items: flex-start; padding: 20px; overflow: auto; }
-
-        /* --- Responsive Logic --- */
         @media screen and (max-width: 1024px) {
             body { flex-direction: column; height: auto; overflow-y: auto; }
             .editor-panel { width: 100%; height: auto; order: 1; padding-bottom: 20px; box-sizing: border-box; }
             .preview-panel { width: 100%; height: auto; order: 2; padding: 10px; background: #e9ecef; overflow-x: hidden; }
             .paper { transform: scale(0.45); transform-origin: top center; margin-bottom: -140mm; } 
         }
+        @media screen and (min-width: 480px) and (max-width: 1024px) { .paper { transform: scale(0.7); margin-bottom: -80mm; } }
 
-        @media screen and (min-width: 480px) and (max-width: 1024px) {
-            .paper { transform: scale(0.7); margin-bottom: -80mm; }
-        }
-
-        /* --- Editor Styling --- */
+        /* Styling เดิม */
         .editor-panel h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; font-size: 1.2rem; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 0.9rem; }
         .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         .form-group input:focus { border-color: #007bff; outline: none; }
         .readonly-field { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
-        
         .slip-preview { width: 100%; max-height: 150px; object-fit: contain; margin-top: 5px; border: 1px dashed #ccc; display: none; }
-
-        /* --- Buttons --- */
         .bottom-action-wrapper { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; border: 1px solid #e9ecef; }
         .action-popup { display: none; margin-bottom: 10px; }
         .btn-action { width: 100%; border: none; padding: 12px; font-size: 1em; cursor: pointer; border-radius: 5px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; font-family: 'Sarabun', sans-serif; }
@@ -53,58 +40,40 @@
         .btn-refresh, .btn-delete { border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; color: white; font-size: 0.8rem; margin-top: 5px;}
         .btn-refresh { background-color: #17a2b8; }
         .btn-delete { background-color: #dc3545; }
-
-        /* --- Paper CSS --- */
-        .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; transition: all 0.3s; }
         
+        /* เพิ่ม CSS ปุ่ม Import/Search */
+        .contract-import-box { background-color: #e8f5e9; border: 1px solid #a5d6a7; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .search-container { background-color: #e3f2fd; border: 1px solid #90caf9; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .search-row { display: flex; gap: 5px; align-items: flex-end; }
+        .btn-search { background-color: #ff9800; border: none; padding: 8px 12px; color: white; border-radius: 4px; cursor: pointer; height: 35px; white-space:nowrap; }
+        .btn-import { background-color: #2ecc71; border: none; padding: 8px 12px; color: white; border-radius: 4px; cursor: pointer; height: 35px; font-weight: bold; white-space:nowrap; }
+
+        /* Paper Styling ต้นฉบับ */
+        .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; transition: all 0.3s; }
         .header { position: relative; height: 50px; margin-bottom: 35px; }
         .header-title { font-size: 24pt; font-weight: bold; position: absolute; left: 0; width: 100%; text-align: center; top: 5px; z-index: 1; }
         .header-meta { text-align: right; line-height: 1.5; position: absolute; right: 0; top: 0; z-index: 2; background: rgba(255,255,255,0.8); }
         #out-contract-no, #out-book, #out-no { color: red; font-weight: bold; }
         .security-ref { font-family: 'Courier Prime', monospace; font-size: 9pt; color: #666; text-align: right; margin-bottom: 10px; letter-spacing: 1px; }
-
         .row { display: flex; margin-bottom: 12px; align-items: flex-end; min-height: 30px; flex-wrap: nowrap; }
         .fixed-width-row { width: 70%; }
         .label { white-space: nowrap; margin-right: 5px; flex-shrink: 0; padding-bottom: 2px; }
-        
         .fill-line { border-bottom: 1px solid #000; flex-grow: 1; min-width: 0; text-align: center; padding: 0 5px; white-space: nowrap; overflow: visible; font-weight: bold; color: #000; }
-        
         .checkbox-group { display: flex; align-items: center; margin-right: 15px; flex-shrink: 0; }
         .box { width: 15px; height: 15px; border: 1px solid black; display: inline-block; margin-right: 5px; text-align: center; line-height: 12px; font-size: 12px; }
-
-        /* Signature & Slip */
         .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; transition: all 0.3s; }
         .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; }
         .slip-on-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
         .signature-box { text-align: center; width: 35%; position: relative; margin-left: auto; }
         .uploaded-sig { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); max-width: 150px; max-height: 80px; mix-blend-mode: multiply; display: none; z-index: 5; }
-
         .footer-wrapper { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
         .footer-text { width: 100%; font-size: 12pt; line-height: 1.6; color: #333; }
         .warning-box { margin-top: 20px; margin-bottom: 15px; font-weight: bold; color: red; border: 3px solid red; padding: 10px; justify-content: center; border-radius: 8px; }
-
-        /* --- Compact Mode CSS (สำหรับบันทึกรูปแบบย่อ) --- */
-        .paper.compact-mode {
-            min-height: auto !important; /* ปลดล็อคความสูง A4 ให้สั้นเท่าเนื้อหา */
-            height: auto !important;
-            padding-bottom: 20px !important;
-        }
         
-        /* ลดระยะห่างคำเตือนกับลายเซ็น (เหลือประมาณ 2 บรรทัด) */
-        .paper.compact-mode .warning-box {
-            margin-bottom: 40px !important; /* ระยะห่างลงมาหาลายเซ็น */
-        }
-        .paper.compact-mode .signature-section {
-            margin-top: 0 !important; /* ลบ margin เดิมออก */
-            height: 130px !important; /* ลดความสูงลงเพราะไม่มีสลิป */
-        }
-        
-        /* ลดระยะห่างผู้รับเงินกับ Footer (เหลือ 1 บรรทัด) */
-        .paper.compact-mode .footer-wrapper {
-            margin-top: 20px !important; /* ระยะห่างจากลายเซ็นมาหา Footer */
-            padding-top: 0 !important;
-        }
-
+        .paper.compact-mode { min-height: auto !important; height: auto !important; padding-bottom: 20px !important; }
+        .paper.compact-mode .warning-box { margin-bottom: 40px !important; }
+        .paper.compact-mode .signature-section { margin-top: 0 !important; height: 130px !important; }
+        .paper.compact-mode .footer-wrapper { margin-top: 20px !important; padding-top: 0 !important; }
         @page { size: A4 portrait; margin: 0; }
         @media print {
             body { background: white; height: auto; display: block; overflow: visible; }
@@ -119,7 +88,25 @@
 
     <div class="editor-panel">
         <h2>กรอกข้อมูลใบเสร็จ</h2>
-        
+
+        <div class="contract-import-box">
+            <label style="color:#2e7d32; font-weight:bold;">📂 ดึงข้อมูลจากสัญญา</label>
+            <div class="search-row">
+                <input type="text" id="import-contract-no" placeholder="ระบุเลขที่สัญญา (เช่น 66/001)" style="width: 70%;">
+                <button class="btn-import" onclick="importFromContract()">ดึงข้อมูล</button>
+            </div>
+            <small style="color:#666;">* ระบบจะคำนวณงวด, ยอดเงิน และวันที่ให้</small>
+        </div>
+
+        <div class="search-container">
+            <label style="font-size:0.9rem; font-weight:bold; color:#1565c0;">🔍 แก้ไขใบเสร็จเก่า</label>
+            <div class="search-row">
+                <input type="text" id="search-book" placeholder="ชุดที่" style="width: 40%;">
+                <input type="text" id="search-no" placeholder="เลขที่" style="width: 40%;">
+                <button class="btn-search" onclick="fetchBillData()">ค้นหา</button>
+            </div>
+        </div>
+
         <div class="form-group">
             <label>รหัสอ้างอิง (Auto)</label>
             <input type="text" id="in-security-ref" class="readonly-field" readonly>
@@ -127,13 +114,13 @@
         </div>
 
         <div class="form-group">
-            <label>วันที่ (เลขชุดเปลี่ยนตามเดือนปี)</label>
+            <label>วันที่</label>
             <input type="date" id="in-date" oninput="saveHistory(); handleDateChange(this.value)">
         </div>
 
         <div class="form-group">
-            <label>สัญญาเลขที่ (Contract No.)</label>
-            <input type="text" id="in-contract-no" value="" placeholder="เช่น 66001" oninput="saveHistory(); sync('contract-no')">
+            <label>สัญญาเลขที่</label>
+            <input type="text" id="in-contract-no" oninput="saveHistory(); sync('contract-no')">
         </div>
 
         <div style="display: flex; gap: 10px;">
@@ -142,10 +129,10 @@
                 <input type="text" id="in-book" class="readonly-field" readonly>
             </div>
             <div class="form-group" style="width: 50%;">
-                <label>เลขที่ใบเสร็จ (Auto Run)</label>
+                <label>เลขที่ (Auto)</label>
                 <div style="display:flex; gap:5px;">
                      <input type="text" id="in-no" value="0001" oninput="saveHistory(); sync('no')">
-                     <button class="btn-refresh" onclick="fetchNextBillNo()" title="โหลดเลขล่าสุดจาก Drive">↻</button>
+                     <button class="btn-refresh" onclick="fetchNextBillNo()" title="โหลดเลขล่าสุด">↻</button>
                 </div>
             </div>
         </div>
@@ -168,7 +155,7 @@
 
         <div class="form-group">
             <label>ชื่อสินค้า</label>
-            <input type="text" id="in-product-name" oninput="saveHistory(); sync('product-name')" placeholder="ระบุชื่อสินค้า...">
+            <input type="text" id="in-product-name" oninput="saveHistory(); sync('product-name')">
         </div>
 
         <div class="form-group">
@@ -179,9 +166,18 @@
                 <option value="installment">ค่างวด</option>
             </select>
         </div>
+        
         <div class="form-group" id="group-installment" style="display:none;">
-            <label>งวดที่</label>
-            <input type="text" id="in-period" oninput="saveHistory(); sync('period')">
+            <div style="display: flex; gap: 10px;">
+                <div style="width: 50%;">
+                    <label>งวดที่</label>
+                    <input type="text" id="in-period" oninput="saveHistory(); sync('period'); calculateRemaining()">
+                </div>
+                <div style="width: 50%;">
+                    <label style="color:green;">ทั้งหมด</label>
+                    <input type="number" id="in-total-period" oninput="calculateRemaining()">
+                </div>
+            </div>
         </div>
         
         <div class="form-group">
@@ -198,7 +194,7 @@
         <hr>
         <h3>ส่วนยอดคงเหลือ</h3>
         <div class="form-group">
-            <label>จำนวนงวดคงเหลือ (งวด)</label>
+            <label>จำนวนงวดคงเหลือ (งวด) <span id="calc-status" style="color:blue;"></span></label>
             <input type="text" id="in-rem-month" oninput="saveHistory(); sync('rem-month')">
         </div>
         <div class="form-group">
@@ -226,10 +222,9 @@
         <div class="bottom-action-wrapper">
             <div id="action-popup" class="action-popup">
                 <button class="btn-action btn-sub-print" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
-                <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (ไม่มีสลิป/ย่อ)</button>
-                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกขึ้น Drive (มีสลิป)</button>
-                
-                </div>
+                <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (ย่อ)</button>
+                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกขึ้น Drive</button>
+            </div>
             <button class="btn-action btn-main" onclick="toggleActionPopup()">🚀 จัดการเอกสาร</button>
         </div>
     </div>
@@ -332,8 +327,10 @@
     </div>
 
     <script>
-        // *** CONFIGURATION ***
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbxvSVBR91kw7gF_8Mng6tpPmsIORER9goOAb5FQhCx4nfvJ4RxBFKGVWc7ImTWrNHH91g/exec"; 
+        // ***********************************************
+        // ⚠️ สำคัญ: ใส่ URL ใหม่ที่ได้จากการ Deploy ที่นี่ ⚠️
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbyWTbSNeEdij32o3VX7apAZ4Ecfe3EMXtnhDsxITuUTW3PVfWto4ScdXp34HY6br_ZtCw/exec"; 
+        // ***********************************************
 
         // --- Core Functions ---
         function toggleActionPopup() {
@@ -342,253 +339,218 @@
             if(popup.style.display === 'block') popup.scrollIntoView({ behavior: 'smooth' });
         }
 
-        // --- Auto Run Number Logic ---
+        // --- Import Logic (อัปเดตตามคำขอ) ---
+        function importFromContract() {
+            const cNo = document.getElementById('import-contract-no').value;
+            if(!cNo) return alert("กรุณากรอกเลขสัญญา");
+            const btn = document.querySelector('.btn-import');
+            const oldTxt = btn.innerText; btn.innerText = "⏳.."; btn.disabled = true;
+
+            fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    // Map Data
+                    document.getElementById('in-contract-no').value = data.c_no;
+                    document.getElementById('in-customer').value = data.b_name; // ชื่อลูกค้าอย่างเดียว
+                    document.getElementById('in-product-name').value = data.p_name;
+                    
+                    // ยอดเงิน -> ใส่ช่องงวดละ และ จำนวนเงิน (พร้อมวงเล็บ)
+                    document.getElementById('in-rem-amount').value = data.amount;
+                    document.getElementById('in-amount').value = data.amount;
+
+                    // วันที่
+                    if(data.due_day) document.getElementById('in-due-date').value = data.due_day;
+                    if(data.first_date) document.getElementById('in-start-date').value = data.first_date;
+
+                    // งวด
+                    document.getElementById('in-type').value = 'installment';
+                    document.getElementById('in-period').value = data.next_period;
+                    document.getElementById('in-total-period').value = data.total_period;
+
+                    // Sync & Format
+                    sync('contract-no'); sync('customer'); sync('product-name'); sync('due-date');
+                    formatMoney(document.getElementById('in-rem-amount'));
+                    formatMoney(document.getElementById('in-amount')); // อันนี้จะเติม (ตัวอักษร) ให้เอง
+                    formatStartDate(document.getElementById('in-start-date').value);
+                    toggleType(); calculateRemaining(); fetchNextBillNo();
+                    
+                    alert(`✅ ดึงข้อมูลสำเร็จ! งวดที่ต้องจ่ายคือ ${data.next_period}`);
+                } else {
+                    alert("❌ ไม่พบเลขที่สัญญานี้ หรือชำระครบแล้ว");
+                }
+            })
+            .catch(err => alert("Error: " + err))
+            .finally(() => { btn.innerText = oldTxt; btn.disabled = false; });
+        }
+
+        function calculateRemaining() {
+            const cur = parseInt(document.getElementById('in-period').value)||0;
+            const tot = parseInt(document.getElementById('in-total-period').value)||0;
+            if(tot>0 && cur>0) {
+                const rem = tot-cur;
+                document.getElementById('in-rem-month').value = (rem>=0)?rem:0;
+                sync('rem-month');
+                document.getElementById('calc-status').innerText = (rem>=0)?` (เหลือ ${rem})`:" (เกิน)";
+            }
+        }
+
         function fetchNextBillNo() {
             const book = document.getElementById('in-book').value;
             if(!book) return;
-            
-            const btn = document.querySelector('.btn-refresh');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "...";
-            
             fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`)
-                .then(response => response.json())
+                .then(res => res.json())
                 .then(data => {
                     if(data.status === 'success') {
                         document.getElementById('in-no').value = data.nextNo;
                         sync('no');
                     }
-                    btn.innerHTML = originalText;
-                })
-                .catch(err => {
-                    console.error("Fetch Error:", err);
-                    btn.innerHTML = originalText;
                 });
         }
 
-        function handleDateChange(dateStr) { 
-            formatDate(dateStr); 
-            updateSetNumber(dateStr); 
+        function fetchBillData() {
+            const sBook = document.getElementById('search-book').value;
+            const sNo = document.getElementById('search-no').value;
+            if(!sBook || !sNo) { alert("กรุณาระบุชุดที่และเลขที่ให้ครบ"); return; }
+            const btn = document.querySelector('.btn-search');
+            const oldTxt = btn.innerText; btn.innerText = "⏳.."; btn.disabled = true;
+
+            fetch(`${googleScriptUrl}?action=getBillData&book=${sBook}&no=${sNo}`)
+                .then(response => response.json())
+                .then(data => {
+                    if(data.status === 'success') {
+                        document.getElementById('in-book').value = sBook; document.getElementById('out-book').innerText = sBook;
+                        document.getElementById('in-no').value = sNo; sync('no');
+
+                        ['contractNo','shopName','shopPhone','customer','product','amount','remMonth','remAmount','dueDate','receiver','ref'].forEach(k => {
+                            if(data[k]) document.getElementById('in-'+k.replace(/([A-Z])/g, '-$1').toLowerCase()).value = data[k];
+                        });
+                        
+                        if(data.date) { document.getElementById('in-date').value = data.date; handleDateChange(data.date); }
+                        if(data.startDate) { document.getElementById('in-start-date').value = data.startDate; formatStartDate(data.startDate); }
+                        
+                        if(data.period && data.period != "-") {
+                             document.getElementById('in-type').value = 'installment';
+                             document.getElementById('in-period').value = data.period;
+                        } else { document.getElementById('in-type').value = 'contract'; }
+                        toggleType();
+
+                        // Sync UI
+                        sync('contract-no'); sync('shop-name'); formatPhone(document.getElementById('in-shop-phone'));
+                        sync('customer'); sync('product-name'); formatMoney(document.getElementById('in-amount'));
+                        sync('rem-month'); formatMoney(document.getElementById('in-rem-amount'));
+                        sync('due-date'); sync('receiver'); sync('security-ref'); sync('period');
+
+                        alert("✅ ดึงข้อมูลใบเสร็จเก่าสำเร็จ");
+                    } else { alert("❌ ไม่พบข้อมูลใบเสร็จนี้"); }
+                    btn.innerText = oldTxt; btn.disabled = false;
+                });
         }
 
-        function updateSetNumber(dateStr) {
-            if (!dateStr) return;
-            const date = new Date(dateStr); 
-            const yearBE = date.getFullYear() + 543;
-            const shortYear = yearBE.toString().slice(-2); 
-            const month = (date.getMonth() + 1).toString().padStart(2, '0');
-            const setNumber = shortYear + month;
-            
-            const oldBook = document.getElementById('in-book').value;
-            document.getElementById('in-book').value = setNumber; 
-            document.getElementById('out-book').innerText = setNumber;
-
-            if(oldBook !== setNumber) {
-                fetchNextBillNo();
-            }
-        }
-
-        // --- Submit Logic (Cloud - With Slip Evidence) ---
         function submitToDatabase() {
-            if (!googleScriptUrl) { alert("กรุณาตั้งค่า Google Script URL"); return; }
-            
+            if (!googleScriptUrl || googleScriptUrl.startsWith("URL")) { alert("กรุณาใส่ URL Script ก่อน"); return; }
             const btn = document.querySelector('.btn-sub-cloud');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "⏳ กำลังบันทึก...";
-            btn.disabled = true;
-
-            // แก้ไข: ไม่ซ่อนสลิปแล้ว เพราะต้องการให้ใบเสร็จที่มีหลักฐานการชำระเงินอัพขึ้นไดรฟ์
-            // ระยะบรรทัด: คงเดิม ไม่ใช้ Compact mode
+            const oldTxt = btn.innerHTML; btn.innerHTML = "⏳ กำลังบันทึก..."; btn.disabled = true;
 
             html2canvas(document.getElementById("bill-paper"), { scale: 2, useCORS: true }).then(canvas => {
-                const receiptJpg = canvas.toDataURL("image/jpeg", 0.8).split(',')[1];
-                
                 const payload = {
                     action: 'saveData',
-                    book: document.getElementById('in-book').value,
-                    no: document.getElementById('in-no').value,
-                    contractNo: document.getElementById('in-contract-no').value,
-                    period: document.getElementById('in-period').value || "-",
-                    amount: document.getElementById('in-amount').value,
-                    product: document.getElementById('in-product-name').value, // เพิ่มฟิลด์สินค้า
-                    ref: document.getElementById('in-security-ref').value,
-                    receiptImage: receiptJpg,
-                    slipImage: "" 
+                    book: document.getElementById('in-book').value, no: document.getElementById('in-no').value,
+                    ref: document.getElementById('in-security-ref').value, date: document.getElementById('in-date').value,
+                    contractNo: document.getElementById('in-contract-no').value, shopName: document.getElementById('in-shop-name').value,
+                    shopPhone: document.getElementById('in-shop-phone').value, customer: document.getElementById('in-customer').value,
+                    product: document.getElementById('in-product-name').value, period: document.getElementById('in-period').value || "-",
+                    amount: document.getElementById('in-amount').value, remMonth: document.getElementById('in-rem-month').value,
+                    remAmount: document.getElementById('in-rem-amount').value, dueDate: document.getElementById('in-due-date').value,
+                    startDate: document.getElementById('in-start-date').value, receiver: document.getElementById('in-receiver').value,
+                    receiptImage: canvas.toDataURL("image/jpeg", 0.8).split(',')[1], slipImage: ""
                 };
 
                 const slipInput = document.getElementById('in-slip-file');
                 if (slipInput.files.length > 0) {
                     const reader = new FileReader();
-                    reader.onload = function(e) {
-                        payload.slipImage = e.target.result.split(',')[1];
-                        sendData(payload, btn, originalText);
-                    };
+                    reader.onload = function(e) { payload.slipImage = e.target.result.split(',')[1]; sendData(payload, btn, oldTxt); };
                     reader.readAsDataURL(slipInput.files[0]);
-                } else {
-                    sendData(payload, btn, originalText);
-                }
-            }).catch(err => {
-                alert('Error: ' + err);
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+                } else { sendData(payload, btn, oldTxt); }
             });
         }
 
-        function sendData(payload, btn, originalText) {
-            fetch(googleScriptUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(() => {
-                alert('✅ บันทึกและอัพโหลดเรียบร้อย!');
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }).catch(err => {
-                alert('❌ ผิดพลาด: ' + err);
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            });
+        function sendData(payload, btn, txt) {
+            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            .then(() => { alert('✅ บันทึกสำเร็จ!'); btn.innerHTML = txt; btn.disabled = false; })
+            .catch(err => { alert('❌ ผิดพลาด: ' + err); btn.innerHTML = txt; btn.disabled = false; });
         }
 
-        // --- Save Local (Image - Compact Mode / No Slip) ---
         function saveAsImage() {
             const paper = document.getElementById("bill-paper");
-            const slipContainer = document.getElementById('slip-container-paper');
-            const originalDisplay = slipContainer.style.display;
-
-            // 1. ซ่อนสลิป (ตามโจทย์: ใบเสร็จที่ไม่มีภาพหลักฐานมาอยู่ในเมนูบันทึกภาพ)
-            slipContainer.style.display = 'none';
-            
-            // 2. ปรับระยะบรรทัด (Compact Mode)
+            const slipC = document.getElementById('slip-container-paper');
+            const d = slipC.style.display; slipC.style.display = 'none';
             paper.classList.add('compact-mode');
-
             html2canvas(paper, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
-                link.href = canvas.toDataURL("image/jpeg", 0.9);
-                link.click();
-
-                // 3. คืนค่าเดิม
-                slipContainer.style.display = originalDisplay;
-                paper.classList.remove('compact-mode');
+                link.href = canvas.toDataURL("image/jpeg", 0.9); link.click();
+                slipC.style.display = d; paper.classList.remove('compact-mode');
             });
         }
 
         // --- Helper Functions ---
-        function previewSlip(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('slip-preview-img').src = e.target.result;
-                    document.getElementById('slip-preview-img').style.display = 'block';
-                    document.getElementById('out-slip-img-paper').src = e.target.result;
-                    document.getElementById('slip-container-paper').style.display = 'flex';
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function handleSignatureUpload(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => { 
-                    document.getElementById('out-sig-img').src = e.target.result; 
-                    document.getElementById('out-sig-img').style.display = 'block'; 
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-        function removeSignature() {
-            document.getElementById('out-sig-img').style.display = 'none';
-            document.getElementById('in-sig-file').value = '';
-        }
+        function previewSlip(input) { if (input.files[0]) { var r = new FileReader(); r.onload = function(e) { document.getElementById('slip-preview-img').src = e.target.result; document.getElementById('slip-preview-img').style.display = 'block'; document.getElementById('out-slip-img-paper').src = e.target.result; document.getElementById('slip-container-paper').style.display = 'flex'; }; r.readAsDataURL(input.files[0]); } }
+        function handleSignatureUpload(input) { if (input.files[0]) { const r = new FileReader(); r.onload = e => { document.getElementById('out-sig-img').src = e.target.result; document.getElementById('out-sig-img').style.display = 'block'; }; r.readAsDataURL(input.files[0]); } }
+        function removeSignature() { document.getElementById('out-sig-img').style.display = 'none'; document.getElementById('in-sig-file').value = ''; }
         function sync(id) { document.getElementById('out-' + id).innerText = document.getElementById('in-' + id).value; }
-        function formatDate(dateStr) {
-            if(!dateStr) return;
-            const date = new Date(dateStr);
-            document.getElementById('out-date').innerText = date.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-        }
-        function formatStartDate(dateStr) {
-            if(!dateStr) return;
-            document.getElementById('out-start-date').innerText = new Date(dateStr).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-        }
-        function formatPhone(input) {
-            let val = input.value.replace(/\D/g, '');
-            if(val.length === 10) input.value = val.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
-            document.getElementById('out-shop-phone').innerText = input.value;
-        }
+        function formatDate(d) { if(!d) return; document.getElementById('out-date').innerText = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }); }
+        function formatStartDate(d) { if(!d) return; document.getElementById('out-start-date').innerText = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }); }
+        function formatPhone(i) { let val = i.value.replace(/\D/g, ''); if(val.length === 10) i.value = val.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'); document.getElementById('out-shop-phone').innerText = i.value; }
+        
         function formatMoney(input) {
-            let val = input.value.replace(/[^0-9.]/g, '');
+            let val = String(input.value).replace(/[^0-9.]/g, '');
             const parts = val.split('.');
             parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
             input.value = parts.join('.');
             let out = input.value + (parts.length === 1 || parts[1] === "" ? ".-" : "");
             
+            // Logic เพิ่มคำอ่านจำนวนเงิน
             if(input.id === 'in-amount') {
                 out += " บาท (" + ThaiNumberToText(val) + ")";
             }
-            
             document.getElementById('out-' + input.id.replace('in-', '')).innerText = out;
         }
 
         function ThaiNumberToText(number) {
-            number = parseFloat(number.replace(/,/g, ''));
+            number = parseFloat(String(number).replace(/,/g, ''));
             if (isNaN(number)) return "";
-            
             const thaiNum = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
             const unit = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
-            
-            let bahtText = "";
-            let sNumber = number.toFixed(2).split('.');
-            let baht = sNumber[0];
-            let satang = sNumber[1];
-            
+            let txt = ""; let sNumber = number.toFixed(2).split('.'); let baht = sNumber[0]; let satang = sNumber[1];
             if (parseInt(baht) === 0 && parseInt(satang) === 0) return "ศูนย์บาทถ้วน";
-            
             if (parseInt(baht) > 0) {
-                let len = baht.length;
-                for (let i = 0; i < len; i++) {
-                    let n = baht.charAt(i);
+                for (let i = 0; i < baht.length; i++) {
+                    let n = baht.charAt(i), len = baht.length - i - 1;
                     if (n !== '0') {
-                        if ((i === (len - 1)) && (n === '1')) {
-                            bahtText += (bahtText.length === 0) ? thaiNum[1] : 'เอ็ด';
-                        } else if ((i === (len - 2)) && (n === '2')) {
-                            bahtText += 'ยี่';
-                        } else if ((i === (len - 2)) && (n === '1')) {
-                            bahtText += '';
-                        } else {
-                            bahtText += thaiNum[parseInt(n)];
-                        }
-                        bahtText += unit[len - i - 1];
+                        if (len === 0 && n === '1' && baht.length > 1) txt += 'เอ็ด';
+                        else if (len === 1 && n === '2') txt += 'ยี่';
+                        else if (len === 1 && n === '1') txt += '';
+                        else txt += thaiNum[parseInt(n)];
+                        txt += unit[len];
                     }
                 }
-                bahtText += 'บาท';
+                txt += 'บาท';
             }
-            
             if (parseInt(satang) > 0) {
-                let len = satang.length;
-                for (let i = 0; i < len; i++) {
-                    let n = satang.charAt(i);
+                for (let i = 0; i < satang.length; i++) {
+                    let n = satang.charAt(i), len = satang.length - i - 1;
                     if (n !== '0') {
-                        if ((i === (len - 1)) && (n === '1') && (satang.charAt(0) !== '0')) {
-                            bahtText += 'เอ็ด';
-                        } else if ((i === (len - 2)) && (n === '2')) {
-                            bahtText += 'ยี่';
-                        } else if ((i === (len - 2)) && (n === '1')) {
-                            bahtText += '';
-                        } else {
-                            bahtText += thaiNum[parseInt(n)];
-                        }
-                        bahtText += (len - i - 1 === 1) ? 'สิบ' : '';
+                        if (len === 0 && n === '1' && satang.charAt(0) !== '0') txt += 'เอ็ด';
+                        else if (len === 1 && n === '2') txt += 'ยี่';
+                        else if (len === 1 && n === '1') txt += '';
+                        else txt += thaiNum[parseInt(n)];
+                        txt += (len === 1) ? 'สิบ' : '';
                     }
                 }
-                bahtText += 'สตางค์';
-            } else {
-                bahtText += 'ถ้วน';
-            }
-            
-            return bahtText;
+                txt += 'สตางค์';
+            } else { txt += 'ถ้วน'; }
+            return txt;
         }
 
         function generateSecurityCode() {
@@ -602,25 +564,20 @@
             document.getElementById('group-installment').style.display = (type === 'installment') ? 'block' : 'none';
         }
 
-        // --- HISTORY (Undo/Redo) ---
         let historyStack = [];
         let historyIndex = -1;
-        const maxHistory = 50;
-
-        function saveHistory() {
-            const currentState = {};
-            document.querySelectorAll('input:not([type="file"]), select').forEach(el => {
-                currentState[el.id] = el.value;
-            });
-            if (historyIndex < historyStack.length - 1) {
-                historyStack = historyStack.slice(0, historyIndex + 1);
-            }
-            historyStack.push(JSON.stringify(currentState));
-            if (historyStack.length > maxHistory) historyStack.shift();
-            else historyIndex++;
+        function saveHistory() {} // Placeholder
+        
+        function handleDateChange(dateStr) {
+            formatDate(dateStr);
+            if (!dateStr) return;
+            const dt = new Date(dateStr);
+            const b = (dt.getFullYear() + 543).toString().substr(2, 2) + (dt.getMonth() + 1).toString().padStart(2, '0');
+            const old = document.getElementById('in-book').value;
+            document.getElementById('in-book').value = b; document.getElementById('out-book').innerText = b;
+            if (old !== b) fetchNextBillNo();
         }
         
-        // --- Init ---
         window.onload = function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('in-date').value = today;
