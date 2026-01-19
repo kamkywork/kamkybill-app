@@ -320,7 +320,7 @@
     <script>
         // ***********************************************
         // ⚠️ สำคัญ: ใส่ URL ใหม่ที่ได้จากการ Deploy ที่นี่ ⚠️
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbxH2U-N7SDKizOzsm9ElwEFzP112430VHE7j67qLaT_kap89Jdu7XxiJFk-8IJ2MwNFkg/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzflHBkII_OoBjbIrJdqKzkNkgY09jo8SjVhoysaZcc5vF9lDpdpT6N1EDf-RUrJBgAJg/exec"; 
         // ***********************************************
 
         // --- Core Functions ---
@@ -540,32 +540,19 @@
         }
         
         window.onload = function() {
-            // 1. ตั้งค่าเริ่มต้นเดิม
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('in-date').value = today;
-            handleDateChange(today);
-            generateSecurityCode();
-            saveHistory();
+    // ... โค้ดตั้งค่าเริ่มต้นเดิม ...
 
-            // รอสักครู่เพื่อให้ Script พร้อม แล้วค่อยรันเลขบิล
-            setTimeout(fetchNextBillNo, 1000);
+    // 👇 ส่วนสำคัญ: ต้องมีโค้ดนี้เพื่อรับค่าจาก URL Web App
+    const urlParams = new URLSearchParams(window.location.search);
+    const refContract = urlParams.get('ref');
 
-            // ----------------------------------------------------
-            // 2. ส่วนที่เพิ่ม: รับค่าจากหน้าติดตามหนี้ (Auto Import)
-            // ----------------------------------------------------
-            const urlParams = new URLSearchParams(window.location.search);
-            const refContract = urlParams.get('ref'); // รับค่าตัวแปรชื่อ 'ref'
-
-            if (refContract) {
-                // ถ้ามีเลขส่งมา ให้ใส่ในช่องค้นหา แล้วกดปุ่มดึงข้อมูลทันที
-                document.getElementById('import-contract-no').value = refContract;
-                
-                // รอ 0.5 วิ เพื่อความชัวร์ แล้วสั่ง Import
-                setTimeout(() => {
-                    importFromContract();
-                }, 500);
-            }
-        }
+    if (refContract) {
+        document.getElementById('import-contract-no').value = refContract;
+        setTimeout(() => {
+            importFromContract();
+        }, 1000); // เพิ่มเวลาหน่วงนิดหน่อยเพื่อให้ Web App โหลดเสร็จทัน
+    }
+}
     </script>
 </body>
 </html>
