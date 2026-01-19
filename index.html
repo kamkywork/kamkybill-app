@@ -540,12 +540,31 @@
         }
         
         window.onload = function() {
+            // 1. ตั้งค่าเริ่มต้นเดิม
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('in-date').value = today;
             handleDateChange(today);
             generateSecurityCode();
-            setTimeout(fetchNextBillNo, 1000);
             saveHistory();
+
+            // รอสักครู่เพื่อให้ Script พร้อม แล้วค่อยรันเลขบิล
+            setTimeout(fetchNextBillNo, 1000);
+
+            // ----------------------------------------------------
+            // 2. ส่วนที่เพิ่ม: รับค่าจากหน้าติดตามหนี้ (Auto Import)
+            // ----------------------------------------------------
+            const urlParams = new URLSearchParams(window.location.search);
+            const refContract = urlParams.get('ref'); // รับค่าตัวแปรชื่อ 'ref'
+
+            if (refContract) {
+                // ถ้ามีเลขส่งมา ให้ใส่ในช่องค้นหา แล้วกดปุ่มดึงข้อมูลทันที
+                document.getElementById('import-contract-no').value = refContract;
+                
+                // รอ 0.5 วิ เพื่อความชัวร์ แล้วสั่ง Import
+                setTimeout(() => {
+                    importFromContract();
+                }, 500);
+            }
         }
     </script>
 </body>
