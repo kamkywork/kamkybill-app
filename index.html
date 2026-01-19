@@ -98,15 +98,6 @@
             <small style="color:#666;">* ระบบจะคำนวณงวด, ยอดเงิน และวันที่ให้</small>
         </div>
 
-        <div class="search-container">
-            <label style="font-size:0.9rem; font-weight:bold; color:#1565c0;">🔍 แก้ไขใบเสร็จเก่า</label>
-            <div class="search-row">
-                <input type="text" id="search-book" placeholder="ชุดที่" style="width: 40%;">
-                <input type="text" id="search-no" placeholder="เลขที่" style="width: 40%;">
-                <button class="btn-search" onclick="fetchBillData()">ค้นหา</button>
-            </div>
-        </div>
-
         <div class="form-group">
             <label>รหัสอ้างอิง (Auto)</label>
             <input type="text" id="in-security-ref" class="readonly-field" readonly>
@@ -329,7 +320,7 @@
     <script>
         // ***********************************************
         // ⚠️ สำคัญ: ใส่ URL ใหม่ที่ได้จากการ Deploy ที่นี่ ⚠️
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbyWTbSNeEdij32o3VX7apAZ4Ecfe3EMXtnhDsxITuUTW3PVfWto4ScdXp34HY6br_ZtCw/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzHpV1s6GkLcsAxiqdu5QmEANdc8CK0JZwPHeTsL-7gRx-rITCaIkTYFja2Kdnc3ZrwOw/exec"; 
         // ***********************************************
 
         // --- Core Functions ---
@@ -350,30 +341,39 @@
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
-                    // Map Data
+                    // 1. Map Data พื้นฐาน
                     document.getElementById('in-contract-no').value = data.c_no;
-                    document.getElementById('in-customer').value = data.b_name; // ชื่อลูกค้าอย่างเดียว
+                    document.getElementById('in-customer').value = data.b_name; 
                     document.getElementById('in-product-name').value = data.p_name;
                     
-                    // ยอดเงิน -> ใส่ช่องงวดละ และ จำนวนเงิน (พร้อมวงเล็บ)
+                    // 2. ยอดเงิน
                     document.getElementById('in-rem-amount').value = data.amount;
                     document.getElementById('in-amount').value = data.amount;
 
-                    // วันที่
+                    // 3. วันที่
                     if(data.due_day) document.getElementById('in-due-date').value = data.due_day;
                     if(data.first_date) document.getElementById('in-start-date').value = data.first_date;
 
-                    // งวด
-                    document.getElementById('in-type').value = 'installment';
-                    document.getElementById('in-period').value = data.next_period;
-                    document.getElementById('in-total-period').value = data.total_period;
+                    // 4. ตั้งค่า งวดที่ (Auto Fill)
+                    document.getElementById('in-type').value = 'installment'; // เปลี่ยน Dropdown เป็นค่างวด
+                    document.getElementById('in-period').value = data.next_period; // ใส่เลขงวดที่ได้จาก Database
+                    document.getElementById('in-total-period').value = data.total_period; // ใส่จำนวนงวดทั้งหมด
 
-                    // Sync & Format
-                    sync('contract-no'); sync('customer'); sync('product-name'); sync('due-date');
+                    // 5. Sync ข้อมูลลงกระดาษ Preview (เพิ่ม sync('period') เพื่อให้โชว์ทันที)
+                    sync('contract-no'); 
+                    sync('customer'); 
+                    sync('product-name'); 
+                    sync('due-date');
+                    sync('period');  // <--- จุดสำคัญที่เพิ่มเข้ามา
+                    
+                    // 6. จัด Format และคำนวณส่วนที่เหลือ
                     formatMoney(document.getElementById('in-rem-amount'));
-                    formatMoney(document.getElementById('in-amount')); // อันนี้จะเติม (ตัวอักษร) ให้เอง
+                    formatMoney(document.getElementById('in-amount')); 
                     formatStartDate(document.getElementById('in-start-date').value);
-                    toggleType(); calculateRemaining(); fetchNextBillNo();
+                    
+                    toggleType();       // สั่งติ๊กถูกช่อง "ค่างวด" บนกระดาษ
+                    calculateRemaining(); // คำนวณงวดคงเหลือทันที
+                    fetchNextBillNo();  // รันเลขที่บิล
                     
                     alert(`✅ ดึงข้อมูลสำเร็จ! งวดที่ต้องจ่ายคือ ${data.next_period}`);
                 } else {
@@ -405,45 +405,6 @@
                         document.getElementById('in-no').value = data.nextNo;
                         sync('no');
                     }
-                });
-        }
-
-        function fetchBillData() {
-            const sBook = document.getElementById('search-book').value;
-            const sNo = document.getElementById('search-no').value;
-            if(!sBook || !sNo) { alert("กรุณาระบุชุดที่และเลขที่ให้ครบ"); return; }
-            const btn = document.querySelector('.btn-search');
-            const oldTxt = btn.innerText; btn.innerText = "⏳.."; btn.disabled = true;
-
-            fetch(`${googleScriptUrl}?action=getBillData&book=${sBook}&no=${sNo}`)
-                .then(response => response.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        document.getElementById('in-book').value = sBook; document.getElementById('out-book').innerText = sBook;
-                        document.getElementById('in-no').value = sNo; sync('no');
-
-                        ['contractNo','shopName','shopPhone','customer','product','amount','remMonth','remAmount','dueDate','receiver','ref'].forEach(k => {
-                            if(data[k]) document.getElementById('in-'+k.replace(/([A-Z])/g, '-$1').toLowerCase()).value = data[k];
-                        });
-                        
-                        if(data.date) { document.getElementById('in-date').value = data.date; handleDateChange(data.date); }
-                        if(data.startDate) { document.getElementById('in-start-date').value = data.startDate; formatStartDate(data.startDate); }
-                        
-                        if(data.period && data.period != "-") {
-                             document.getElementById('in-type').value = 'installment';
-                             document.getElementById('in-period').value = data.period;
-                        } else { document.getElementById('in-type').value = 'contract'; }
-                        toggleType();
-
-                        // Sync UI
-                        sync('contract-no'); sync('shop-name'); formatPhone(document.getElementById('in-shop-phone'));
-                        sync('customer'); sync('product-name'); formatMoney(document.getElementById('in-amount'));
-                        sync('rem-month'); formatMoney(document.getElementById('in-rem-amount'));
-                        sync('due-date'); sync('receiver'); sync('security-ref'); sync('period');
-
-                        alert("✅ ดึงข้อมูลใบเสร็จเก่าสำเร็จ");
-                    } else { alert("❌ ไม่พบข้อมูลใบเสร็จนี้"); }
-                    btn.innerText = oldTxt; btn.disabled = false;
                 });
         }
 
