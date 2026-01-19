@@ -540,19 +540,48 @@
         }
         
         window.onload = function() {
-    // ... โค้ดตั้งค่าเริ่มต้นเดิม ...
+            // 1. ตั้งค่าเริ่มต้นเดิม
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('in-date').value = today;
+            handleDateChange(today);
+            generateSecurityCode();
+            saveHistory();
+            setTimeout(fetchNextBillNo, 1000);
 
-    // 👇 ส่วนสำคัญ: ต้องมีโค้ดนี้เพื่อรับค่าจาก URL Web App
-    const urlParams = new URLSearchParams(window.location.search);
-    const refContract = urlParams.get('ref');
-
-    if (refContract) {
-        document.getElementById('import-contract-no').value = refContract;
-        setTimeout(() => {
-            importFromContract();
-        }, 1000); // เพิ่มเวลาหน่วงนิดหน่อยเพื่อให้ Web App โหลดเสร็จทัน
-    }
-}
+            // ----------------------------------------------------
+            // 2. ส่วนที่แก้ไข: รับค่า Ref สำหรับ Web App (Google Apps Script)
+            // ----------------------------------------------------
+            
+            // ตรวจสอบว่ารันบน Google Web App หรือไม่
+            if (typeof google !== 'undefined' && google.script && google.script.url) {
+                google.script.url.getLocation(function(location) {
+                    // ดึงค่า parameter ชื่อ 'ref'
+                    const refContract = location.parameter.ref;
+                    
+                    if (refContract) {
+                        // ใส่เลขสัญญาลงกล่องค้นหา
+                        document.getElementById('import-contract-no').value = refContract;
+                        
+                        // เปลี่ยนข้อความปุ่มให้รู้ว่ากำลังทำงาน
+                        const btn = document.querySelector('.btn-import');
+                        if(btn) btn.innerText = "⏳ รอสักครู่...";
+                        
+                        // รอ 1.5 วินาทีเพื่อให้ระบบพร้อม แล้วกดค้นหา
+                        setTimeout(() => {
+                            importFromContract();
+                        }, 1500);
+                    }
+                });
+            } else {
+                // Fallback: กรณีเปิดไฟล์ HTML ธรรมดา (ไม่ได้ขึ้น Web App)
+                const urlParams = new URLSearchParams(window.location.search);
+                const refContract = urlParams.get('ref');
+                if (refContract) {
+                    document.getElementById('import-contract-no').value = refContract;
+                    setTimeout(importFromContract, 1500);
+                }
+            }
+        }
     </script>
 </body>
 </html>
