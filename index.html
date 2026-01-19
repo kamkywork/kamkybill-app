@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน (Original Look + Smart Data)</title>
-    
+    <title>ระบบออกใบเสร็จรับเงิน</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <style>
-        /* --- CSS ตามไฟล์ต้นฉบับ 100% --- */
+        /* CSS เดิม */
         :root { --paper-width: 210mm; --paper-height: 297mm; }
         body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; overflow: hidden; }
         .editor-panel { width: 35%; background: #ffffff; padding: 20px; padding-bottom: 50px; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10; display: flex; flex-direction: column; }
@@ -22,7 +21,6 @@
         }
         @media screen and (min-width: 480px) and (max-width: 1024px) { .paper { transform: scale(0.7); margin-bottom: -80mm; } }
 
-        /* Styling เดิม */
         .editor-panel h2 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; font-size: 1.2rem; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 0.9rem; }
@@ -41,14 +39,12 @@
         .btn-refresh { background-color: #17a2b8; }
         .btn-delete { background-color: #dc3545; }
         
-        /* เพิ่ม CSS ปุ่ม Import/Search */
         .contract-import-box { background-color: #e8f5e9; border: 1px solid #a5d6a7; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .search-container { background-color: #e3f2fd; border: 1px solid #90caf9; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .search-row { display: flex; gap: 5px; align-items: flex-end; }
         .btn-search { background-color: #ff9800; border: none; padding: 8px 12px; color: white; border-radius: 4px; cursor: pointer; height: 35px; white-space:nowrap; }
         .btn-import { background-color: #2ecc71; border: none; padding: 8px 12px; color: white; border-radius: 4px; cursor: pointer; height: 35px; font-weight: bold; white-space:nowrap; }
 
-        /* Paper Styling ต้นฉบับ */
         .paper { width: var(--paper-width); min-height: var(--paper-height); background: white; padding: 15mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); position: relative; box-sizing: border-box; font-size: 14pt; display: flex; flex-direction: column; line-height: 1.5; transition: all 0.3s; }
         .header { position: relative; height: 50px; margin-bottom: 35px; }
         .header-title { font-size: 24pt; font-weight: bold; position: absolute; left: 0; width: 100%; text-align: center; top: 5px; z-index: 1; }
@@ -318,269 +314,105 @@
     </div>
 
     <script>
-        // ***********************************************
-        // ⚠️ สำคัญ: ใส่ URL ใหม่ที่ได้จากการ Deploy ที่นี่ ⚠️
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzflHBkII_OoBjbIrJdqKzkNkgY09jo8SjVhoysaZcc5vF9lDpdpT6N1EDf-RUrJBgAJg/exec"; 
-        // ***********************************************
-
-        // --- Core Functions ---
-        function toggleActionPopup() {
-            const popup = document.getElementById('action-popup');
-            popup.style.display = (popup.style.display === 'block') ? 'none' : 'block';
-            if(popup.style.display === 'block') popup.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // --- Import Logic (อัปเดตตามคำขอ) ---
+        // ✅✅ แก้ไข URL ตรงนี้แล้ว ✅✅
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbxMppKDUF81jzlUfgyQLBglhTkfI0xuucqPSTFIgV4j62l_Js4ac1_DIJNrV1NPAy0h7g/exec"; 
+        
+        function toggleActionPopup() { const p = document.getElementById('action-popup'); p.style.display = (p.style.display==='block')?'none':'block'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
         function importFromContract() {
             const cNo = document.getElementById('import-contract-no').value;
             if(!cNo) return alert("กรุณากรอกเลขสัญญา");
-            const btn = document.querySelector('.btn-import');
-            const oldTxt = btn.innerText; btn.innerText = "⏳.."; btn.disabled = true;
-
-            fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`)
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    // 1. Map Data พื้นฐาน
-                    document.getElementById('in-contract-no').value = data.c_no;
-                    document.getElementById('in-customer').value = data.b_name; 
-                    document.getElementById('in-product-name').value = data.p_name;
-                    
-                    // 2. ยอดเงิน
-                    document.getElementById('in-rem-amount').value = data.amount;
-                    document.getElementById('in-amount').value = data.amount;
-
-                    // 3. วันที่
-                    if(data.due_day) document.getElementById('in-due-date').value = data.due_day;
-                    if(data.first_date) document.getElementById('in-start-date').value = data.first_date;
-
-                    // 4. ตั้งค่า งวดที่ (Auto Fill)
-                    document.getElementById('in-type').value = 'installment'; // เปลี่ยน Dropdown เป็นค่างวด
-                    document.getElementById('in-period').value = data.next_period; // ใส่เลขงวดที่ได้จาก Database
-                    document.getElementById('in-total-period').value = data.total_period; // ใส่จำนวนงวดทั้งหมด
-
-                    // 5. Sync ข้อมูลลงกระดาษ Preview (เพิ่ม sync('period') เพื่อให้โชว์ทันที)
-                    sync('contract-no'); 
-                    sync('customer'); 
-                    sync('product-name'); 
-                    sync('due-date');
-                    sync('period');  // <--- จุดสำคัญที่เพิ่มเข้ามา
-                    
-                    // 6. จัด Format และคำนวณส่วนที่เหลือ
-                    formatMoney(document.getElementById('in-rem-amount'));
-                    formatMoney(document.getElementById('in-amount')); 
-                    formatStartDate(document.getElementById('in-start-date').value);
-                    
-                    toggleType();       // สั่งติ๊กถูกช่อง "ค่างวด" บนกระดาษ
-                    calculateRemaining(); // คำนวณงวดคงเหลือทันที
-                    fetchNextBillNo();  // รันเลขที่บิล
-                    
-                    alert(`✅ ดึงข้อมูลสำเร็จ! งวดที่ต้องจ่ายคือ ${data.next_period}`);
-                } else {
-                    alert("❌ ไม่พบเลขที่สัญญานี้ หรือชำระครบแล้ว");
-                }
-            })
-            .catch(err => alert("Error: " + err))
-            .finally(() => { btn.innerText = oldTxt; btn.disabled = false; });
+            const btn = document.querySelector('.btn-import'); const old = btn.innerText; btn.innerText="⏳.."; btn.disabled=true;
+            fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`).then(r=>r.json()).then(d=>{
+                if(d.status==='success') {
+                    document.getElementById('in-contract-no').value = d.c_no;
+                    document.getElementById('in-customer').value = d.b_name; 
+                    document.getElementById('in-product-name').value = d.p_name;
+                    document.getElementById('in-rem-amount').value = d.amount;
+                    document.getElementById('in-amount').value = d.amount;
+                    if(d.due_day) document.getElementById('in-due-date').value = d.due_day;
+                    if(d.first_date) document.getElementById('in-start-date').value = d.first_date;
+                    document.getElementById('in-type').value = 'installment';
+                    document.getElementById('in-period').value = d.next_period;
+                    document.getElementById('in-total-period').value = d.total_period;
+                    sync('contract-no'); sync('customer'); sync('product-name'); sync('due-date'); sync('period');
+                    formatMoney(document.getElementById('in-rem-amount')); formatMoney(document.getElementById('in-amount'));
+                    formatStartDate(document.getElementById('in-start-date').value); toggleType(); calculateRemaining(); fetchNextBillNo();
+                    alert(`✅ ดึงข้อมูลสำเร็จ! งวดที่ต้องจ่ายคือ ${d.next_period}`);
+                } else { alert("❌ ไม่พบเลขที่สัญญานี้ หรือชำระครบแล้ว"); }
+            }).catch(e=>alert("Error: "+e)).finally(()=>{ btn.innerText=old; btn.disabled=false; });
         }
-
         function calculateRemaining() {
             const cur = parseInt(document.getElementById('in-period').value)||0;
             const tot = parseInt(document.getElementById('in-total-period').value)||0;
             if(tot>0 && cur>0) {
                 const rem = tot-cur;
-                document.getElementById('in-rem-month').value = (rem>=0)?rem:0;
-                sync('rem-month');
+                document.getElementById('in-rem-month').value = (rem>=0)?rem:0; sync('rem-month');
                 document.getElementById('calc-status').innerText = (rem>=0)?` (เหลือ ${rem})`:" (เกิน)";
             }
         }
-
         function fetchNextBillNo() {
-            const book = document.getElementById('in-book').value;
-            if(!book) return;
-            fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`)
-                .then(res => res.json())
-                .then(data => {
-                    if(data.status === 'success') {
-                        document.getElementById('in-no').value = data.nextNo;
-                        sync('no');
-                    }
-                });
+            const book = document.getElementById('in-book').value; if(!book) return;
+            fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`).then(r=>r.json()).then(d=>{ if(d.status==='success'){ document.getElementById('in-no').value=d.nextNo; sync('no'); }});
         }
-
         function submitToDatabase() {
-            if (!googleScriptUrl || googleScriptUrl.startsWith("URL")) { alert("กรุณาใส่ URL Script ก่อน"); return; }
-            const btn = document.querySelector('.btn-sub-cloud');
-            const oldTxt = btn.innerHTML; btn.innerHTML = "⏳ กำลังบันทึก..."; btn.disabled = true;
-
-            html2canvas(document.getElementById("bill-paper"), { scale: 2, useCORS: true }).then(canvas => {
-                const payload = {
-                    action: 'saveData',
-                    book: document.getElementById('in-book').value, no: document.getElementById('in-no').value,
-                    ref: document.getElementById('in-security-ref').value, date: document.getElementById('in-date').value,
-                    contractNo: document.getElementById('in-contract-no').value, shopName: document.getElementById('in-shop-name').value,
-                    shopPhone: document.getElementById('in-shop-phone').value, customer: document.getElementById('in-customer').value,
-                    product: document.getElementById('in-product-name').value, period: document.getElementById('in-period').value || "-",
-                    amount: document.getElementById('in-amount').value, remMonth: document.getElementById('in-rem-month').value,
-                    remAmount: document.getElementById('in-rem-amount').value, dueDate: document.getElementById('in-due-date').value,
-                    startDate: document.getElementById('in-start-date').value, receiver: document.getElementById('in-receiver').value,
-                    receiptImage: canvas.toDataURL("image/jpeg", 0.8).split(',')[1], slipImage: ""
+            if(!googleScriptUrl) return alert("URL Error");
+            const btn=document.querySelector('.btn-sub-cloud'); const old=btn.innerHTML; btn.innerHTML="⏳..."; btn.disabled=true;
+            html2canvas(document.getElementById("bill-paper"), {scale:2,useCORS:true}).then(c=>{
+                const p = {
+                    action:'saveData', book:document.getElementById('in-book').value, no:document.getElementById('in-no').value,
+                    ref:document.getElementById('in-security-ref').value, date:document.getElementById('in-date').value,
+                    contractNo:document.getElementById('in-contract-no').value, shopName:document.getElementById('in-shop-name').value,
+                    shopPhone:document.getElementById('in-shop-phone').value, customer:document.getElementById('in-customer').value,
+                    product:document.getElementById('in-product-name').value, period:document.getElementById('in-period').value||"-",
+                    amount:document.getElementById('in-amount').value, remMonth:document.getElementById('in-rem-month').value,
+                    remAmount:document.getElementById('in-rem-amount').value, dueDate:document.getElementById('in-due-date').value,
+                    startDate:document.getElementById('in-start-date').value, receiver:document.getElementById('in-receiver').value,
+                    receiptImage:c.toDataURL("image/jpeg",0.8).split(',')[1], slipImage:""
                 };
-
-                const slipInput = document.getElementById('in-slip-file');
-                if (slipInput.files.length > 0) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) { payload.slipImage = e.target.result.split(',')[1]; sendData(payload, btn, oldTxt); };
-                    reader.readAsDataURL(slipInput.files[0]);
-                } else { sendData(payload, btn, oldTxt); }
+                const f = document.getElementById('in-slip-file');
+                if(f.files.length>0) { const r=new FileReader(); r.onload=e=>{ p.slipImage=e.target.result.split(',')[1]; sendData(p,btn,old); }; r.readAsDataURL(f.files[0]); }
+                else { sendData(p,btn,old); }
             });
         }
-
-        function sendData(payload, btn, txt) {
-            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-            .then(() => { alert('✅ บันทึกสำเร็จ!'); btn.innerHTML = txt; btn.disabled = false; })
-            .catch(err => { alert('❌ ผิดพลาด: ' + err); btn.innerHTML = txt; btn.disabled = false; });
-        }
-
+        function sendData(p,b,t) { fetch(googleScriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(()=>{ alert('✅ บันทึกสำเร็จ!'); b.innerHTML=t; b.disabled=false; }).catch(e=>{ alert('❌ Error: '+e); b.innerHTML=t; b.disabled=false; }); }
         function saveAsImage() {
-            const paper = document.getElementById("bill-paper");
-            const slipC = document.getElementById('slip-container-paper');
-            const d = slipC.style.display; slipC.style.display = 'none';
-            paper.classList.add('compact-mode');
-            html2canvas(paper, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
-                link.href = canvas.toDataURL("image/jpeg", 0.9); link.click();
-                slipC.style.display = d; paper.classList.remove('compact-mode');
+            const p = document.getElementById("bill-paper"); const s = document.getElementById('slip-container-paper'); const d = s.style.display; s.style.display='none'; p.classList.add('compact-mode');
+            html2canvas(p,{scale:2,backgroundColor:"#ffffff"}).then(c=>{
+                const l = document.createElement('a'); l.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
+                l.href = c.toDataURL("image/jpeg",0.9); l.click(); s.style.display=d; p.classList.remove('compact-mode');
             });
         }
-
-        // --- Helper Functions ---
-        function previewSlip(input) { if (input.files[0]) { var r = new FileReader(); r.onload = function(e) { document.getElementById('slip-preview-img').src = e.target.result; document.getElementById('slip-preview-img').style.display = 'block'; document.getElementById('out-slip-img-paper').src = e.target.result; document.getElementById('slip-container-paper').style.display = 'flex'; }; r.readAsDataURL(input.files[0]); } }
-        function handleSignatureUpload(input) { if (input.files[0]) { const r = new FileReader(); r.onload = e => { document.getElementById('out-sig-img').src = e.target.result; document.getElementById('out-sig-img').style.display = 'block'; }; r.readAsDataURL(input.files[0]); } }
-        function removeSignature() { document.getElementById('out-sig-img').style.display = 'none'; document.getElementById('in-sig-file').value = ''; }
-        function sync(id) { document.getElementById('out-' + id).innerText = document.getElementById('in-' + id).value; }
-        function formatDate(d) { if(!d) return; document.getElementById('out-date').innerText = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }); }
-        function formatStartDate(d) { if(!d) return; document.getElementById('out-start-date').innerText = new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }); }
-        function formatPhone(i) { let val = i.value.replace(/\D/g, ''); if(val.length === 10) i.value = val.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3'); document.getElementById('out-shop-phone').innerText = i.value; }
-        
-        function formatMoney(input) {
-            let val = String(input.value).replace(/[^0-9.]/g, '');
-            const parts = val.split('.');
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-            input.value = parts.join('.');
-            let out = input.value + (parts.length === 1 || parts[1] === "" ? ".-" : "");
-            
-            // Logic เพิ่มคำอ่านจำนวนเงิน
-            if(input.id === 'in-amount') {
-                out += " บาท (" + ThaiNumberToText(val) + ")";
-            }
-            document.getElementById('out-' + input.id.replace('in-', '')).innerText = out;
+        function previewSlip(i) { if(i.files[0]) { var r=new FileReader(); r.onload=e=>{ document.getElementById('slip-preview-img').src=e.target.result; document.getElementById('slip-preview-img').style.display='block'; document.getElementById('out-slip-img-paper').src=e.target.result; document.getElementById('slip-container-paper').style.display='flex'; }; r.readAsDataURL(i.files[0]); } }
+        function handleSignatureUpload(i) { if(i.files[0]) { const r=new FileReader(); r.onload=e=>{ document.getElementById('out-sig-img').src=e.target.result; document.getElementById('out-sig-img').style.display='block'; }; r.readAsDataURL(i.files[0]); } }
+        function removeSignature() { document.getElementById('out-sig-img').style.display='none'; document.getElementById('in-sig-file').value=''; }
+        function sync(id) { document.getElementById('out-'+id).innerText=document.getElementById('in-'+id).value; }
+        function formatDate(d) { if(!d)return; document.getElementById('out-date').innerText=new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}); }
+        function formatStartDate(d) { if(!d)return; document.getElementById('out-start-date').innerText=new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}); }
+        function formatPhone(i) { let v=i.value.replace(/\D/g,''); if(v.length===10) i.value=v.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'); document.getElementById('out-shop-phone').innerText=i.value; }
+        function formatMoney(i) {
+            let v=String(i.value).replace(/[^0-9.]/g,''), p=v.split('.'); p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,","); i.value=p.join('.');
+            let o=i.value+(p.length===1||p[1]===""?".-":""); if(i.id==='in-amount') o+=" บาท ("+ThaiNumberToText(v)+")";
+            document.getElementById('out-'+i.id.replace('in-','')).innerText=o;
         }
-
-        function ThaiNumberToText(number) {
-            number = parseFloat(String(number).replace(/,/g, ''));
-            if (isNaN(number)) return "";
-            const thaiNum = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
-            const unit = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
-            let txt = ""; let sNumber = number.toFixed(2).split('.'); let baht = sNumber[0]; let satang = sNumber[1];
-            if (parseInt(baht) === 0 && parseInt(satang) === 0) return "ศูนย์บาทถ้วน";
-            if (parseInt(baht) > 0) {
-                for (let i = 0; i < baht.length; i++) {
-                    let n = baht.charAt(i), len = baht.length - i - 1;
-                    if (n !== '0') {
-                        if (len === 0 && n === '1' && baht.length > 1) txt += 'เอ็ด';
-                        else if (len === 1 && n === '2') txt += 'ยี่';
-                        else if (len === 1 && n === '1') txt += '';
-                        else txt += thaiNum[parseInt(n)];
-                        txt += unit[len];
-                    }
-                }
-                txt += 'บาท';
-            }
-            if (parseInt(satang) > 0) {
-                for (let i = 0; i < satang.length; i++) {
-                    let n = satang.charAt(i), len = satang.length - i - 1;
-                    if (n !== '0') {
-                        if (len === 0 && n === '1' && satang.charAt(0) !== '0') txt += 'เอ็ด';
-                        else if (len === 1 && n === '2') txt += 'ยี่';
-                        else if (len === 1 && n === '1') txt += '';
-                        else txt += thaiNum[parseInt(n)];
-                        txt += (len === 1) ? 'สิบ' : '';
-                    }
-                }
-                txt += 'สตางค์';
-            } else { txt += 'ถ้วน'; }
+        function ThaiNumberToText(n) {
+            n=parseFloat(String(n).replace(/,/g,'')); if(isNaN(n))return""; const t=['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'], u=['','สิบ','ร้อย','พัน','หมื่น','แสน','ล้าน'];
+            let txt="", s=n.toFixed(2).split('.'), b=s[0], st=s[1];
+            if(parseInt(b)===0&&parseInt(st)===0)return"ศูนย์บาทถ้วน";
+            if(parseInt(b)>0){ for(let i=0;i<b.length;i++){ let d=b.charAt(i), l=b.length-i-1; if(d!=='0'){ if(l===0&&d==='1'&&b.length>1)txt+='เอ็ด'; else if(l===1&&d==='2')txt+='ยี่'; else if(l===1&&d==='1')txt+=''; else txt+=t[parseInt(d)]; txt+=u[l]; } } txt+='บาท'; }
+            if(parseInt(st)>0){ for(let i=0;i<st.length;i++){ let d=st.charAt(i), l=st.length-i-1; if(d!=='0'){ if(l===0&&d==='1'&&st.charAt(0)!=='0')txt+='เอ็ด'; else if(l===1&&d==='2')txt+='ยี่'; else if(l===1&&d==='1')txt+=''; else txt+=t[parseInt(d)]; txt+=(l===1)?'สิบ':''; } } txt+='สตางค์'; } else txt+='ถ้วน';
             return txt;
         }
-
-        function generateSecurityCode() {
-            document.getElementById('in-security-ref').value = "TRX" + Math.random().toString(36).substr(2, 9).toUpperCase();
-            sync('security-ref');
+        function generateSecurityCode() { document.getElementById('in-security-ref').value="TRX"+Math.random().toString(36).substr(2,9).toUpperCase(); sync('security-ref'); }
+        function toggleType() { const t=document.getElementById('in-type').value; document.getElementById('box-contract').innerText=(t==='contract')?"✓":""; document.getElementById('box-installment').innerText=(t==='installment')?"✓":""; document.getElementById('group-installment').style.display=(t==='installment')?'block':'none'; }
+        function saveHistory(){}
+        function handleDateChange(d) {
+            formatDate(d); if(!d)return; const dt=new Date(d), b=(dt.getFullYear()+543).toString().substr(2,2)+(dt.getMonth()+1).toString().padStart(2,'0'), old=document.getElementById('in-book').value;
+            document.getElementById('in-book').value=b; document.getElementById('out-book').innerText=b; if(old!==b) fetchNextBillNo();
         }
-        function toggleType() {
-            const type = document.getElementById('in-type').value;
-            document.getElementById('box-contract').innerText = (type === 'contract') ? "✓" : "";
-            document.getElementById('box-installment').innerText = (type === 'installment') ? "✓" : "";
-            document.getElementById('group-installment').style.display = (type === 'installment') ? 'block' : 'none';
-        }
-
-        let historyStack = [];
-        let historyIndex = -1;
-        function saveHistory() {} // Placeholder
-        
-        function handleDateChange(dateStr) {
-            formatDate(dateStr);
-            if (!dateStr) return;
-            const dt = new Date(dateStr);
-            const b = (dt.getFullYear() + 543).toString().substr(2, 2) + (dt.getMonth() + 1).toString().padStart(2, '0');
-            const old = document.getElementById('in-book').value;
-            document.getElementById('in-book').value = b; document.getElementById('out-book').innerText = b;
-            if (old !== b) fetchNextBillNo();
-        }
-        
-        window.onload = function() {
-            // 1. ตั้งค่าเริ่มต้นเดิม
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('in-date').value = today;
-            handleDateChange(today);
-            generateSecurityCode();
-            saveHistory();
-            setTimeout(fetchNextBillNo, 1000);
-
-            // ----------------------------------------------------
-            // 2. ส่วนที่แก้ไข: รับค่า Ref สำหรับ Web App (Google Apps Script)
-            // ----------------------------------------------------
-            
-            // ตรวจสอบว่ารันบน Google Web App หรือไม่
-            if (typeof google !== 'undefined' && google.script && google.script.url) {
-                google.script.url.getLocation(function(location) {
-                    // ดึงค่า parameter ชื่อ 'ref'
-                    const refContract = location.parameter.ref;
-                    
-                    if (refContract) {
-                        // ใส่เลขสัญญาลงกล่องค้นหา
-                        document.getElementById('import-contract-no').value = refContract;
-                        
-                        // เปลี่ยนข้อความปุ่มให้รู้ว่ากำลังทำงาน
-                        const btn = document.querySelector('.btn-import');
-                        if(btn) btn.innerText = "⏳ รอสักครู่...";
-                        
-                        // รอ 1.5 วินาทีเพื่อให้ระบบพร้อม แล้วกดค้นหา
-                        setTimeout(() => {
-                            importFromContract();
-                        }, 1500);
-                    }
-                });
-            } else {
-                // Fallback: กรณีเปิดไฟล์ HTML ธรรมดา (ไม่ได้ขึ้น Web App)
-                const urlParams = new URLSearchParams(window.location.search);
-                const refContract = urlParams.get('ref');
-                if (refContract) {
-                    document.getElementById('import-contract-no').value = refContract;
-                    setTimeout(importFromContract, 1500);
-                }
-            }
+        window.onload=function(){
+            const t=new Date().toISOString().split('T')[0]; document.getElementById('in-date').value=t; handleDateChange(t); generateSecurityCode(); setTimeout(fetchNextBillNo,1000);
+            const u = new URLSearchParams(window.location.search); const r = u.get('ref');
+            if(r) { document.getElementById('import-contract-no').value=r; setTimeout(importFromContract,1500); }
         }
     </script>
 </body>
