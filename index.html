@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน</title>
+    <title>ระบบออกใบเสร็จรับเงิน (Multi-Slip)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -27,7 +27,11 @@
         .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: 'Sarabun', sans-serif; box-sizing: border-box; }
         .form-group input:focus { border-color: #007bff; outline: none; }
         .readonly-field { background-color: #e9ecef; color: #495057; cursor: not-allowed; }
-        .slip-preview { width: 100%; max-height: 150px; object-fit: contain; margin-top: 5px; border: 1px dashed #ccc; display: none; }
+        
+        /* CSS ปรับปรุงสำหรับ Multi-Slip Preview */
+        .slip-preview-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .slip-preview-item { width: 48%; border: 1px dashed #ccc; object-fit: contain; }
+        
         .bottom-action-wrapper { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; border: 1px solid #e9ecef; }
         .action-popup { display: none; margin-bottom: 10px; }
         .btn-action { width: 100%; border: none; padding: 12px; font-size: 1em; cursor: pointer; border-radius: 5px; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; font-family: 'Sarabun', sans-serif; }
@@ -58,8 +62,14 @@
         .checkbox-group { display: flex; align-items: center; margin-right: 15px; flex-shrink: 0; }
         .box { width: 15px; height: 15px; border: 1px solid black; display: inline-block; margin-right: 5px; text-align: center; line-height: 12px; font-size: 12px; }
         .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; transition: all 0.3s; }
-        .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; }
-        .slip-on-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
+        
+        /* ปรับ CSS สำหรับ Slip ในกระดาษ */
+        .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; overflow: hidden; }
+        .slip-paper-gallery { width: 100%; height: 100%; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 2px; overflow: hidden; justify-content: center; }
+        .slip-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
+        /* กรณีมีหลายรูป ให้ขนาดเล็กลง */
+        .slip-paper-img.multi { width: 48%; max-height: 120px; object-fit: cover; border: 1px solid #eee; }
+
         .signature-box { text-align: center; width: 35%; position: relative; margin-left: auto; }
         .uploaded-sig { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); max-width: 150px; max-height: 80px; mix-blend-mode: multiply; display: none; z-index: 5; }
         .footer-wrapper { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -173,9 +183,18 @@
         </div>
 
         <div class="form-group" style="background: #e8f0fe; padding: 10px; border-radius: 5px; border: 1px solid #b3d7ff;">
-            <label style="color: #004085;">📎 แนบรูปสลิป</label>
-            <input type="file" id="in-slip-file" accept="image/*" onchange="previewSlip(this)">
-            <img id="slip-preview-img" class="slip-preview">
+            <label style="color: #004085;">📎 แนบรูปสลิป (เลือกได้หลายรูป)</label>
+            <input type="file" id="in-slip-file" accept="image/*" multiple onchange="previewSlip(this)">
+            <div id="slip-preview-container" class="slip-preview-container"></div>
+        </div>
+        
+        <div class="form-group">
+            <label>รูปแบบการชำระ (สำหรับบันทึก ไม่โชว์ในบิล)</label>
+            <select id="in-pay-method" onchange="saveHistory()">
+            <option value="เงินสด">💵 เงินสด</option>
+            <option value="โอน">🏦 โอน</option>
+            <option value="โอนร้าน">🏪 โอนร้าน</option>
+            </select>
         </div>
         
         <hr>
@@ -291,7 +310,7 @@
             <div class="signature-section">
                 <div id="slip-container-paper" class="slip-on-paper-container">
                     <div class="slip-label" style="width:100%; border-bottom:1px solid #eee; text-align:center; font-weight:bold;">หลักฐานการชำระเงิน</div>
-                    <img id="out-slip-img-paper" class="slip-on-paper-img">
+                    <div id="slip-gallery" class="slip-paper-gallery"></div>
                 </div>
                 <div class="signature-box">
                     <img id="out-sig-img" class="uploaded-sig">
@@ -314,8 +333,7 @@
     </div>
 
     <script>
-        // ✅✅ แก้ไข URL ตรงนี้แล้ว ✅✅
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbxMppKDUF81jzlUfgyQLBglhTkfI0xuucqPSTFIgV4j62l_Js4ac1_DIJNrV1NPAy0h7g/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwsjiAlmrLAEoGSKNr1E5Yuo6jGxWS3WAY1ewtIDw9oKvaY2z22gxDZATjcuJtJw_g29w/exec"; 
         
         function toggleActionPopup() { const p = document.getElementById('action-popup'); p.style.display = (p.style.display==='block')?'none':'block'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
         function importFromContract() {
@@ -357,24 +375,91 @@
         function submitToDatabase() {
             if(!googleScriptUrl) return alert("URL Error");
             const btn=document.querySelector('.btn-sub-cloud'); const old=btn.innerHTML; btn.innerHTML="⏳..."; btn.disabled=true;
-            html2canvas(document.getElementById("bill-paper"), {scale:2,useCORS:true}).then(c=>{
+    
+            html2canvas(document.getElementById("bill-paper"), {scale:2,useCORS:true}).then(async c=>{
                 const p = {
-                    action:'saveData', book:document.getElementById('in-book').value, no:document.getElementById('in-no').value,
-                    ref:document.getElementById('in-security-ref').value, date:document.getElementById('in-date').value,
-                    contractNo:document.getElementById('in-contract-no').value, shopName:document.getElementById('in-shop-name').value,
-                    shopPhone:document.getElementById('in-shop-phone').value, customer:document.getElementById('in-customer').value,
-                    product:document.getElementById('in-product-name').value, period:document.getElementById('in-period').value||"-",
-                    amount:document.getElementById('in-amount').value, remMonth:document.getElementById('in-rem-month').value,
-                    remAmount:document.getElementById('in-rem-amount').value, dueDate:document.getElementById('in-due-date').value,
-                    startDate:document.getElementById('in-start-date').value, receiver:document.getElementById('in-receiver').value,
-                    receiptImage:c.toDataURL("image/jpeg",0.8).split(',')[1], slipImage:""
+                    action:'saveData', 
+                    book:document.getElementById('in-book').value, 
+                    no:document.getElementById('in-no').value,
+                    ref:document.getElementById('in-security-ref').value, 
+                    date:document.getElementById('in-date').value,
+                    contractNo:document.getElementById('in-contract-no').value, 
+                    shopName:document.getElementById('in-shop-name').value,
+                    shopPhone:document.getElementById('in-shop-phone').value, 
+                    customer:document.getElementById('in-customer').value,
+                    product:document.getElementById('in-product-name').value, 
+                    period:document.getElementById('in-period').value||"-", 
+                    amount:document.getElementById('in-amount').value, 
+                    remMonth:document.getElementById('in-rem-month').value,
+                    remAmount:document.getElementById('in-rem-amount').value, 
+                    dueDate:document.getElementById('in-due-date').value,
+                    startDate:document.getElementById('in-start-date').value, 
+                    receiver:document.getElementById('in-receiver').value,
+                    payMethod: document.getElementById('in-pay-method').value, 
+                    receiptImage:c.toDataURL("image/jpeg",0.8).split(',')[1], 
+                    slipImage:""
                 };
+        
+                // Logic ใหม่: รวมรูปหลายรูปเป็นไฟล์เดียวเพื่อส่ง
                 const f = document.getElementById('in-slip-file');
-                if(f.files.length>0) { const r=new FileReader(); r.onload=e=>{ p.slipImage=e.target.result.split(',')[1]; sendData(p,btn,old); }; r.readAsDataURL(f.files[0]); }
-                else { sendData(p,btn,old); }
+                if(f.files.length > 0) {
+                    try {
+                        const mergedBase64 = await mergeImagesAndGetBase64(f.files);
+                        p.slipImage = mergedBase64.split(',')[1];
+                        sendData(p,btn,old);
+                    } catch(err) {
+                        alert("Error merging images: " + err);
+                        btn.innerHTML=old; btn.disabled=false;
+                    }
+                } else { 
+                    sendData(p,btn,old); 
+                }
             });
         }
+        
+        // ฟังก์ชั่นใหม่: รวมรูปสลิปทั้งหมดเป็นรูปยาว 1 รูป
+        function mergeImagesAndGetBase64(fileList) {
+            return new Promise((resolve, reject) => {
+                const images = [];
+                let loadedCount = 0;
+                
+                if(fileList.length === 0) resolve("");
+
+                Array.from(fileList).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            images.push(img);
+                            loadedCount++;
+                            if (loadedCount === fileList.length) {
+                                // Draw all
+                                const maxWidth = Math.max(...images.map(i => i.width));
+                                const totalHeight = images.reduce((sum, i) => sum + i.height, 0);
+                                const canvas = document.createElement('canvas');
+                                canvas.width = maxWidth;
+                                canvas.height = totalHeight;
+                                const ctx = canvas.getContext('2d');
+                                ctx.fillStyle = "#ffffff";
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                
+                                let y = 0;
+                                images.forEach(img => {
+                                    ctx.drawImage(img, 0, y);
+                                    y += img.height;
+                                });
+                                resolve(canvas.toDataURL('image/jpeg', 0.8));
+                            }
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+        }
+
         function sendData(p,b,t) { fetch(googleScriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(()=>{ alert('✅ บันทึกสำเร็จ!'); b.innerHTML=t; b.disabled=false; }).catch(e=>{ alert('❌ Error: '+e); b.innerHTML=t; b.disabled=false; }); }
+        
         function saveAsImage() {
             const p = document.getElementById("bill-paper"); const s = document.getElementById('slip-container-paper'); const d = s.style.display; s.style.display='none'; p.classList.add('compact-mode');
             html2canvas(p,{scale:2,backgroundColor:"#ffffff"}).then(c=>{
@@ -382,7 +467,41 @@
                 l.href = c.toDataURL("image/jpeg",0.9); l.click(); s.style.display=d; p.classList.remove('compact-mode');
             });
         }
-        function previewSlip(i) { if(i.files[0]) { var r=new FileReader(); r.onload=e=>{ document.getElementById('slip-preview-img').src=e.target.result; document.getElementById('slip-preview-img').style.display='block'; document.getElementById('out-slip-img-paper').src=e.target.result; document.getElementById('slip-container-paper').style.display='flex'; }; r.readAsDataURL(i.files[0]); } }
+        
+        // ฟังก์ชั่น Preview รูป (รองรับหลายรูป)
+        function previewSlip(input) {
+            const previewContainer = document.getElementById('slip-preview-container');
+            const paperGallery = document.getElementById('slip-gallery');
+            const paperContainer = document.getElementById('slip-container-paper');
+            
+            previewContainer.innerHTML = '';
+            paperGallery.innerHTML = '';
+
+            if (input.files && input.files.length > 0) {
+                paperContainer.style.display = 'flex'; // Show container on paper
+                Array.from(input.files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        // Create Editor Preview
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'slip-preview-item';
+                        previewContainer.appendChild(img);
+
+                        // Create Paper Preview
+                        const imgPaper = document.createElement('img');
+                        imgPaper.src = e.target.result;
+                        imgPaper.className = 'slip-paper-img';
+                        if(input.files.length > 1) imgPaper.classList.add('multi'); // ใส่ class ย่อขนาดถ้ามีหลายรูป
+                        paperGallery.appendChild(imgPaper);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                paperContainer.style.display = 'none';
+            }
+        }
+        
         function handleSignatureUpload(i) { if(i.files[0]) { const r=new FileReader(); r.onload=e=>{ document.getElementById('out-sig-img').src=e.target.result; document.getElementById('out-sig-img').style.display='block'; }; r.readAsDataURL(i.files[0]); } }
         function removeSignature() { document.getElementById('out-sig-img').style.display='none'; document.getElementById('in-sig-file').value=''; }
         function sync(id) { document.getElementById('out-'+id).innerText=document.getElementById('in-'+id).value; }
