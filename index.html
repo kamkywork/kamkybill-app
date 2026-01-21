@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน (Multi-Slip)</title>
+    <title>ระบบออกใบเสร็จรับเงิน (Multi-Slip + Edit Mode)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -43,6 +43,13 @@
         .btn-refresh { background-color: #17a2b8; }
         .btn-delete { background-color: #dc3545; }
         
+        /* Box ค้นหาและ Edit Mode */
+        .edit-search-box { background-color: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .mode-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; margin-bottom: 5px; }
+        .mode-new { background: #d4edda; color: #155724; }
+        .mode-edit { background: #f8d7da; color: #721c24; }
+        .old-slip-wrapper { margin-top:10px; padding:5px; border:1px dashed #999; border-radius:5px; background:#fff; }
+
         .contract-import-box { background-color: #e8f5e9; border: 1px solid #a5d6a7; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .search-container { background-color: #e3f2fd; border: 1px solid #90caf9; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .search-row { display: flex; gap: 5px; align-items: flex-end; }
@@ -63,11 +70,9 @@
         .box { width: 15px; height: 15px; border: 1px solid black; display: inline-block; margin-right: 5px; text-align: center; line-height: 12px; font-size: 12px; }
         .signature-section { margin-top: 15px; display: flex; justify-content: space-between; align-items: flex-end; height: 300px; transition: all 0.3s; }
         
-        /* ปรับ CSS สำหรับ Slip ในกระดาษ */
         .slip-on-paper-container { width: 55%; height: 100%; display: none; flex-direction: column; align-items: center; border: 1px solid #333; padding: 5px; border-radius: 4px; box-sizing: border-box; overflow: hidden; }
         .slip-paper-gallery { width: 100%; height: 100%; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 2px; overflow: hidden; justify-content: center; }
         .slip-paper-img { max-width: 100%; max-height: 260px; object-fit: contain; margin-top: 5px; }
-        /* กรณีมีหลายรูป ให้ขนาดเล็กลง */
         .slip-paper-img.multi { width: 48%; max-height: 120px; object-fit: cover; border: 1px solid #eee; }
 
         .signature-box { text-align: center; width: 35%; position: relative; margin-left: auto; }
@@ -95,13 +100,25 @@
     <div class="editor-panel">
         <h2>กรอกข้อมูลใบเสร็จ</h2>
 
+        <div class="edit-search-box">
+            <label style="color:#856404; font-weight:bold;">🔍 ค้นหาบิลเพื่อแก้ไข (Edit)</label>
+            <div class="search-row">
+                <input type="text" id="search-book" placeholder="เล่มที่ (เช่น 6601)" style="width: 40%;">
+                <input type="text" id="search-no" placeholder="เลขที่ (เช่น 0001)" style="width: 40%;">
+                <button class="btn-search" onclick="searchBillToEdit()">ค้นหา</button>
+            </div>
+            <div id="mode-indicator" style="margin-top:5px;">
+                <span class="mode-badge mode-new">สถานะ: สร้างบิลใหม่</span>
+            </div>
+            <button id="btn-cancel-edit" class="btn-delete" style="display:none; width:100%; margin-top:5px;" onclick="resetToNewMode()">ยกเลิกการแก้ไข (กลับไปสร้างใหม่)</button>
+        </div>
+
         <div class="contract-import-box">
-            <label style="color:#2e7d32; font-weight:bold;">📂 ดึงข้อมูลจากสัญญา</label>
+            <label style="color:#2e7d32; font-weight:bold;">📂 ดึงข้อมูลจากสัญญา (New)</label>
             <div class="search-row">
                 <input type="text" id="import-contract-no" placeholder="ระบุเลขที่สัญญา (เช่น 66/001)" style="width: 70%;">
                 <button class="btn-import" onclick="importFromContract()">ดึงข้อมูล</button>
             </div>
-            <small style="color:#666;">* ระบบจะคำนวณงวด, ยอดเงิน และวันที่ให้</small>
         </div>
 
         <div class="form-group">
@@ -184,12 +201,20 @@
 
         <div class="form-group" style="background: #e8f0fe; padding: 10px; border-radius: 5px; border: 1px solid #b3d7ff;">
             <label style="color: #004085;">📎 แนบรูปสลิป (เลือกได้หลายรูป)</label>
+            
+            <div id="old-slip-section" style="display:none; margin-bottom:10px;">
+                 <small style="color:red;">* มีสลิปเดิมอยู่แล้ว (ถ้าไม่เลือกใหม่จะใช้รูปนี้)</small>
+                 <div class="old-slip-wrapper">
+                    <img id="old-slip-img" src="" style="max-width:100%; max-height:150px;">
+                 </div>
+            </div>
+
             <input type="file" id="in-slip-file" accept="image/*" multiple onchange="previewSlip(this)">
             <div id="slip-preview-container" class="slip-preview-container"></div>
         </div>
         
         <div class="form-group">
-            <label>รูปแบบการชำระ (สำหรับบันทึก ไม่โชว์ในบิล)</label>
+            <label>รูปแบบการชำระ</label>
             <select id="in-pay-method" onchange="saveHistory()">
             <option value="เงินสด">💵 เงินสด</option>
             <option value="โอน">🏦 โอน</option>
@@ -229,7 +254,7 @@
             <div id="action-popup" class="action-popup">
                 <button class="btn-action btn-sub-print" onclick="window.print()">🖨️ พิมพ์ / PDF</button>
                 <button class="btn-action btn-sub-save" onclick="saveAsImage()">🖼️ บันทึกรูป (ย่อ)</button>
-                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกขึ้น Drive</button>
+                <button class="btn-action btn-sub-cloud" onclick="submitToDatabase()">☁️ บันทึกขึ้น Drive (Save/Update)</button>
             </div>
             <button class="btn-action btn-main" onclick="toggleActionPopup()">🚀 จัดการเอกสาร</button>
         </div>
@@ -333,10 +358,124 @@
     </div>
 
     <script>
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwsjiAlmrLAEoGSKNr1E5Yuo6jGxWS3WAY1ewtIDw9oKvaY2z22gxDZATjcuJtJw_g29w/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwJClL6DPsTSWPdi0y-o0QYGchnSZHOmVDZ2CA8ww46oJKm7pdh0FQeCUwgu9xA1lzu8w/exec"; 
         
+        var isEditMode = false; // ตัวแปรบอกสถานะว่ากำลังแก้ไขอยู่หรือไม่
+
         function toggleActionPopup() { const p = document.getElementById('action-popup'); p.style.display = (p.style.display==='block')?'none':'block'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
+        
+        // --- ฟังก์ชั่นค้นหาและโหลดข้อมูลมาแก้ไข ---
+        function searchBillToEdit() {
+            const book = document.getElementById('search-book').value;
+            const no = document.getElementById('search-no').value;
+            if(!book || !no) return alert("กรุณากรอกเล่มที่และเลขที่");
+            
+            const btn = document.querySelector('.btn-search'); 
+            const oldTxt = btn.innerText; btn.innerText="🔍.."; btn.disabled=true;
+            
+            // เรียก GAS action=findBill
+            fetch(`${googleScriptUrl}?action=findBill&book=${book}&no=${no}`)
+            .then(r=>r.json())
+            .then(d => {
+                if(d.status === 'success') {
+                    enterEditMode(d.data);
+                } else {
+                    alert("❌ ไม่พบข้อมูลบิลนี้");
+                }
+            })
+            .catch(e => alert("Error finding bill: " + e))
+            .finally(() => { btn.innerText = oldTxt; btn.disabled = false; });
+        }
+
+        function enterEditMode(data) {
+            isEditMode = true;
+            document.getElementById('mode-indicator').innerHTML = `<span class="mode-badge mode-edit">สถานะ: แก้ไขข้อมูล (Update Mode)</span>`;
+            document.getElementById('btn-cancel-edit').style.display = 'block';
+            
+            // ล็อกเล่มที่/เลขที่ ไม่ให้เปลี่ยนตอนแก้ไข
+            document.getElementById('in-book').readOnly = true;
+            document.getElementById('in-no').readOnly = true;
+
+            // Fill Data
+            document.getElementById('in-book').value = data.book;
+            document.getElementById('in-no').value = data.no;
+            document.getElementById('in-security-ref').value = data.ref || "";
+            document.getElementById('in-date').value = data.date ? data.date.split('T')[0] : "";
+            document.getElementById('in-contract-no').value = data.contractNo || "";
+            document.getElementById('in-shop-name').value = data.shopName || "";
+            document.getElementById('in-shop-phone').value = data.shopPhone || "";
+            document.getElementById('in-customer').value = data.customer || "";
+            document.getElementById('in-product-name').value = data.product || "";
+            document.getElementById('in-amount').value = data.amount || "";
+            document.getElementById('in-type').value = (data.period && data.period !== "-") ? "installment" : "contract";
+            document.getElementById('in-period').value = data.period || "";
+            document.getElementById('in-rem-month').value = data.remMonth || "";
+            document.getElementById('in-rem-amount').value = data.remAmount || "";
+            document.getElementById('in-due-date').value = data.dueDate || "";
+            document.getElementById('in-start-date').value = data.startDate ? data.startDate.split('T')[0] : "";
+            document.getElementById('in-receiver').value = data.receiver || "";
+            document.getElementById('in-pay-method').value = data.payMethod || "เงินสด";
+
+            // Handle Slip Image (ถ้ามี)
+            const oldSlipSection = document.getElementById('old-slip-section');
+            const paperContainer = document.getElementById('slip-container-paper');
+            const paperGallery = document.getElementById('slip-gallery');
+            
+            // Reset files
+            document.getElementById('in-slip-file').value = "";
+            document.getElementById('slip-preview-container').innerHTML = "";
+            paperGallery.innerHTML = "";
+
+            if(data.slipImage && data.slipImage !== "") {
+                oldSlipSection.style.display = 'block';
+                // ถ้าเป็น Base64 ใส่ header data:image/jpeg;base64, ลงไป (ถ้า GAS ไม่ได้ส่งมาให้ต้องเติมเอง)
+                // สมมติ GAS ส่งมาแค่ string base64 เพียวๆ
+                let src = data.slipImage.startsWith('http') ? data.slipImage : "data:image/jpeg;base64," + data.slipImage;
+                document.getElementById('old-slip-img').src = src;
+                
+                // Show on paper as well
+                paperContainer.style.display = 'flex';
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'slip-paper-img';
+                paperGallery.appendChild(img);
+            } else {
+                oldSlipSection.style.display = 'none';
+                paperContainer.style.display = 'none';
+            }
+
+            // Sync all fields to preview
+            sync('contract-no'); sync('no'); sync('shop-name'); sync('customer');
+            sync('product-name'); sync('period'); sync('rem-month'); sync('due-date'); sync('receiver'); sync('security-ref');
+            formatDate(document.getElementById('in-date').value);
+            formatStartDate(document.getElementById('in-start-date').value);
+            formatPhone(document.getElementById('in-shop-phone'));
+            formatMoney(document.getElementById('in-amount'));
+            formatMoney(document.getElementById('in-rem-amount'));
+            toggleType();
+
+            alert("📝 โหลดข้อมูลมาแก้ไขแล้ว กด 'บันทึก' เพื่อทับข้อมูลเดิม");
+        }
+
+        function resetToNewMode() {
+            isEditMode = false;
+            document.getElementById('mode-indicator').innerHTML = `<span class="mode-badge mode-new">สถานะ: สร้างบิลใหม่</span>`;
+            document.getElementById('btn-cancel-edit').style.display = 'none';
+            document.getElementById('in-book').readOnly = true; // ยังคงเป็น readonly (auto)
+            document.getElementById('in-no').readOnly = false; // ให้แก้ได้เผื่ออยากแก้
+            document.getElementById('old-slip-section').style.display = 'none';
+            document.getElementById('slip-container-paper').style.display = 'none';
+            document.getElementById('slip-gallery').innerHTML = '';
+            
+            // Clear inputs
+            document.querySelectorAll('input:not(.readonly-field)').forEach(i => i.value = "");
+            generateSecurityCode();
+            fetchNextBillNo(); // กลับไปเลขล่าสุด
+            alert("🔄 กลับสู่โหมดสร้างบิลใหม่");
+        }
+
         function importFromContract() {
+            if(isEditMode) { if(!confirm("คุณกำลังอยู่ในโหมดแก้ไข การดึงสัญญาใหม่จะทับข้อมูลปัจจุบัน?")) return; }
             const cNo = document.getElementById('import-contract-no').value;
             if(!cNo) return alert("กรุณากรอกเลขสัญญา");
             const btn = document.querySelector('.btn-import'); const old = btn.innerText; btn.innerText="⏳.."; btn.disabled=true;
@@ -354,11 +493,13 @@
                     document.getElementById('in-total-period').value = d.total_period;
                     sync('contract-no'); sync('customer'); sync('product-name'); sync('due-date'); sync('period');
                     formatMoney(document.getElementById('in-rem-amount')); formatMoney(document.getElementById('in-amount'));
-                    formatStartDate(document.getElementById('in-start-date').value); toggleType(); calculateRemaining(); fetchNextBillNo();
-                    alert(`✅ ดึงข้อมูลสำเร็จ! งวดที่ต้องจ่ายคือ ${d.next_period}`);
-                } else { alert("❌ ไม่พบเลขที่สัญญานี้ หรือชำระครบแล้ว"); }
+                    formatStartDate(document.getElementById('in-start-date').value); toggleType(); calculateRemaining(); 
+                    if(!isEditMode) fetchNextBillNo();
+                    alert(`✅ ดึงข้อมูลสำเร็จ!`);
+                } else { alert("❌ ไม่พบเลขที่สัญญานี้"); }
             }).catch(e=>alert("Error: "+e)).finally(()=>{ btn.innerText=old; btn.disabled=false; });
         }
+
         function calculateRemaining() {
             const cur = parseInt(document.getElementById('in-period').value)||0;
             const tot = parseInt(document.getElementById('in-total-period').value)||0;
@@ -369,16 +510,20 @@
             }
         }
         function fetchNextBillNo() {
+            if(isEditMode) return; // Edit mode ไม่ต้องดึงเลขใหม่
             const book = document.getElementById('in-book').value; if(!book) return;
             fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`).then(r=>r.json()).then(d=>{ if(d.status==='success'){ document.getElementById('in-no').value=d.nextNo; sync('no'); }});
         }
+        
         function submitToDatabase() {
             if(!googleScriptUrl) return alert("URL Error");
-            const btn=document.querySelector('.btn-sub-cloud'); const old=btn.innerHTML; btn.innerHTML="⏳..."; btn.disabled=true;
+            const btn=document.querySelector('.btn-sub-cloud'); const old=btn.innerHTML; 
+            btn.innerHTML = isEditMode ? "⏳ กำลังแก้ไข..." : "⏳ กำลังบันทึก..."; 
+            btn.disabled=true;
     
             html2canvas(document.getElementById("bill-paper"), {scale:2,useCORS:true}).then(async c=>{
                 const p = {
-                    action:'saveData', 
+                    action: isEditMode ? 'updateData' : 'saveData', // เปลี่ยน Action ตามโหมด
                     book:document.getElementById('in-book').value, 
                     no:document.getElementById('in-no').value,
                     ref:document.getElementById('in-security-ref').value, 
@@ -397,11 +542,16 @@
                     receiver:document.getElementById('in-receiver').value,
                     payMethod: document.getElementById('in-pay-method').value, 
                     receiptImage:c.toDataURL("image/jpeg",0.8).split(',')[1], 
-                    slipImage:""
+                    slipImage:"" // Default empty
                 };
         
-                // Logic ใหม่: รวมรูปหลายรูปเป็นไฟล์เดียวเพื่อส่ง
                 const f = document.getElementById('in-slip-file');
+                
+                // Logic รูปสลิป:
+                // 1. ถ้ามีการเลือกไฟล์ใหม่ -> ใช้ไฟล์ใหม่ (รวมรูปแล้วส่ง)
+                // 2. ถ้าไม่มีไฟล์ใหม่ แต่เป็น Edit Mode -> ส่งค่า "KEEP" เพื่อบอก Backend ว่าใช้รูปเดิม
+                // 3. ถ้าไม่มีไฟล์ใหม่ และไม่ใช่ Edit Mode -> ส่งว่าง
+                
                 if(f.files.length > 0) {
                     try {
                         const mergedBase64 = await mergeImagesAndGetBase64(f.files);
@@ -411,94 +561,109 @@
                         alert("Error merging images: " + err);
                         btn.innerHTML=old; btn.disabled=false;
                     }
-                } else { 
+                } else {
+                    if(isEditMode) {
+                        // เช็คว่ามีรูปเดิมโชว์อยู่ไหม ถ้ามีให้ส่ง KEEP
+                        const oldImg = document.getElementById('old-slip-img').getAttribute('src');
+                        if(oldImg && oldImg !== "") {
+                            p.slipImage = "KEEP"; 
+                        }
+                    }
                     sendData(p,btn,old); 
                 }
             });
         }
         
-        // ฟังก์ชั่นใหม่: รวมรูปสลิปทั้งหมดเป็นรูปยาว 1 รูป
         function mergeImagesAndGetBase64(fileList) {
             return new Promise((resolve, reject) => {
                 const images = [];
                 let loadedCount = 0;
-                
                 if(fileList.length === 0) resolve("");
-
                 Array.from(fileList).forEach(file => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         const img = new Image();
-                        img.onload = () => {
-                            images.push(img);
-                            loadedCount++;
-                            if (loadedCount === fileList.length) {
-                                // Draw all
+                        img.onload = () => { images.push(img); loadedCount++; if (loadedCount === fileList.length) {
                                 const maxWidth = Math.max(...images.map(i => i.width));
                                 const totalHeight = images.reduce((sum, i) => sum + i.height, 0);
-                                const canvas = document.createElement('canvas');
-                                canvas.width = maxWidth;
-                                canvas.height = totalHeight;
-                                const ctx = canvas.getContext('2d');
-                                ctx.fillStyle = "#ffffff";
-                                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                
-                                let y = 0;
-                                images.forEach(img => {
-                                    ctx.drawImage(img, 0, y);
-                                    y += img.height;
-                                });
+                                const canvas = document.createElement('canvas'); canvas.width = maxWidth; canvas.height = totalHeight;
+                                const ctx = canvas.getContext('2d'); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                let y = 0; images.forEach(img => { ctx.drawImage(img, 0, y); y += img.height; });
                                 resolve(canvas.toDataURL('image/jpeg', 0.8));
-                            }
-                        };
-                        img.src = e.target.result;
-                    };
-                    reader.readAsDataURL(file);
+                        }}; img.src = e.target.result;
+                    }; reader.readAsDataURL(file);
                 });
             });
         }
 
-        function sendData(p,b,t) { fetch(googleScriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}).then(()=>{ alert('✅ บันทึกสำเร็จ!'); b.innerHTML=t; b.disabled=false; }).catch(e=>{ alert('❌ Error: '+e); b.innerHTML=t; b.disabled=false; }); }
+        function sendData(p,b,t) { 
+            fetch(googleScriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+            .then(()=>{ 
+                alert(isEditMode ? '✅ แก้ไขข้อมูลเรียบร้อย!' : '✅ บันทึกสำเร็จ!'); 
+                if(isEditMode) resetToNewMode(); // แก้เสร็จกลับไปโหมดปกติ
+                else { 
+                   // ถ้าบันทึกใหม่เสร็จ ให้เคลียร์แค่เลขที่ แล้วรันเลขใหม่
+                   fetchNextBillNo();
+                   document.getElementById('in-slip-file').value = "";
+                   document.getElementById('slip-preview-container').innerHTML="";
+                }
+                b.innerHTML=t; b.disabled=false; 
+            })
+            .catch(e=>{ alert('❌ Error: '+e); b.innerHTML=t; b.disabled=false; }); 
+        }
         
         function saveAsImage() {
-            const p = document.getElementById("bill-paper"); const s = document.getElementById('slip-container-paper'); const d = s.style.display; s.style.display='none'; p.classList.add('compact-mode');
+            const p = document.getElementById("bill-paper"); const s = document.getElementById('slip-container-paper'); const d = s.style.display; 
+            // ตอน save รูป ถ้ามีรูปเก่าอยู่แต่ไม่ได้ upload ใหม่ ให้คงการแสดงผลไว้
+            // แต่ function นี้มันซ่อน s ไว้ก่อน แล้ว capture แล้วค่อยแสดงใหม่ ซึ่งถ้า html2canvas ทำงานถูกก็โอเค
+            // ปรับ compact mode
+            p.classList.add('compact-mode');
+            // กรณี Edit Mode แล้วมีรูปเก่า มันจะ display flex อยู่แล้ว html2canvas น่าจะเห็น
             html2canvas(p,{scale:2,backgroundColor:"#ffffff"}).then(c=>{
                 const l = document.createElement('a'); l.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
-                l.href = c.toDataURL("image/jpeg",0.9); l.click(); s.style.display=d; p.classList.remove('compact-mode');
+                l.href = c.toDataURL("image/jpeg",0.9); l.click(); 
+                // คืนค่า display เดิม (ถ้ามันเคยโชว์ก็ให้โชว์)
+                s.style.display=d; 
+                p.classList.remove('compact-mode');
             });
         }
         
-        // ฟังก์ชั่น Preview รูป (รองรับหลายรูป)
         function previewSlip(input) {
             const previewContainer = document.getElementById('slip-preview-container');
             const paperGallery = document.getElementById('slip-gallery');
             const paperContainer = document.getElementById('slip-container-paper');
-            
+            const oldSlipSection = document.getElementById('old-slip-section');
+
             previewContainer.innerHTML = '';
             paperGallery.innerHTML = '';
 
             if (input.files && input.files.length > 0) {
-                paperContainer.style.display = 'flex'; // Show container on paper
+                // ถ้าเลือกรูปใหม่ ให้ซ่อนรูปเก่า
+                if(oldSlipSection) oldSlipSection.style.display = 'none';
+                
+                paperContainer.style.display = 'flex';
                 Array.from(input.files).forEach(file => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        // Create Editor Preview
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        img.className = 'slip-preview-item';
-                        previewContainer.appendChild(img);
-
-                        // Create Paper Preview
-                        const imgPaper = document.createElement('img');
-                        imgPaper.src = e.target.result;
-                        imgPaper.className = 'slip-paper-img';
-                        if(input.files.length > 1) imgPaper.classList.add('multi'); // ใส่ class ย่อขนาดถ้ามีหลายรูป
+                        const img = document.createElement('img'); img.src = e.target.result; img.className = 'slip-preview-item'; previewContainer.appendChild(img);
+                        const imgPaper = document.createElement('img'); imgPaper.src = e.target.result; imgPaper.className = 'slip-paper-img';
+                        if(input.files.length > 1) imgPaper.classList.add('multi'); 
                         paperGallery.appendChild(imgPaper);
                     };
                     reader.readAsDataURL(file);
                 });
             } else {
-                paperContainer.style.display = 'none';
+                // ถ้า cancel เลือกไฟล์ ให้ดูว่ามีรูปเก่าไหม
+                if(isEditMode && document.getElementById('old-slip-img').src) {
+                    oldSlipSection.style.display = 'block';
+                    paperContainer.style.display = 'flex';
+                    // Restore old image to paper
+                    const oldSrc = document.getElementById('old-slip-img').src;
+                    const imgPaper = document.createElement('img'); imgPaper.src = oldSrc; imgPaper.className = 'slip-paper-img';
+                    paperGallery.appendChild(imgPaper);
+                } else {
+                    paperContainer.style.display = 'none';
+                }
             }
         }
         
@@ -507,7 +672,7 @@
         function sync(id) { document.getElementById('out-'+id).innerText=document.getElementById('in-'+id).value; }
         function formatDate(d) { if(!d)return; document.getElementById('out-date').innerText=new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}); }
         function formatStartDate(d) { if(!d)return; document.getElementById('out-start-date').innerText=new Date(d).toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'}); }
-        function formatPhone(i) { let v=i.value.replace(/\D/g,''); if(v.length===10) i.value=v.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'); document.getElementById('out-shop-phone').innerText=i.value; }
+        function formatPhone(i) { if(!i.value)return; let v=i.value.replace(/\D/g,''); if(v.length===10) i.value=v.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'); document.getElementById('out-shop-phone').innerText=i.value; }
         function formatMoney(i) {
             let v=String(i.value).replace(/[^0-9.]/g,''), p=v.split('.'); p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,","); i.value=p.join('.');
             let o=i.value+(p.length===1||p[1]===""?".-":""); if(i.id==='in-amount') o+=" บาท ("+ThaiNumberToText(v)+")";
@@ -526,7 +691,11 @@
         function saveHistory(){}
         function handleDateChange(d) {
             formatDate(d); if(!d)return; const dt=new Date(d), b=(dt.getFullYear()+543).toString().substr(2,2)+(dt.getMonth()+1).toString().padStart(2,'0'), old=document.getElementById('in-book').value;
-            document.getElementById('in-book').value=b; document.getElementById('out-book').innerText=b; if(old!==b) fetchNextBillNo();
+            // ถ้า Edit Mode ห้ามเปลี่ยนเล่ม
+            if(!isEditMode) {
+                 document.getElementById('in-book').value=b; document.getElementById('out-book').innerText=b; 
+                 if(old!==b) fetchNextBillNo();
+            }
         }
         window.onload=function(){
             const t=new Date().toISOString().split('T')[0]; document.getElementById('in-date').value=t; handleDateChange(t); generateSecurityCode(); setTimeout(fetchNextBillNo,1000);
