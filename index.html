@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน (Multi-Slip + Edit Mode)</title>
+    <title>ระบบออกใบเสร็จรับเงิน (Multi-Slip + Scan QC)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
     <style>
         /* CSS เดิม */
@@ -30,7 +32,14 @@
         
         /* CSS ปรับปรุงสำหรับ Multi-Slip Preview */
         .slip-preview-container { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-        .slip-preview-item { width: 48%; border: 1px dashed #ccc; object-fit: contain; }
+        
+        /* ✅ CSS สำหรับสถานะการตรวจสลิป */
+        .slip-check-wrapper { width: 48%; margin-bottom: 10px; border: 1px solid #ddd; padding: 5px; border-radius: 5px; background: #fafafa; }
+        .slip-preview-item { width: 100%; object-fit: contain; display: block; }
+        .slip-status { font-size: 0.8rem; margin-top: 5px; font-weight: bold; text-align: center; }
+        .status-checking { color: #e67e22; }
+        .status-pass { color: #28a745; }
+        .status-fail { color: #dc3545; }
         
         .bottom-action-wrapper { margin-top: 20px; padding: 15px; background: #f1f3f5; border-radius: 8px; border: 1px solid #e9ecef; }
         .action-popup { display: none; margin-bottom: 10px; }
@@ -195,12 +204,12 @@
         </div>
         
         <div class="form-group">
-            <label>จำนวนเงิน (บาท)</label>
+            <label>จำนวนเงิน (บาท) <span style="color:red; font-size:0.8em;">*ต้องกรอกก่อนแนบสลิป</span></label>
             <input type="text" id="in-amount" oninput="saveHistory(); formatMoney(this)">
         </div>
 
         <div class="form-group" style="background: #e8f0fe; padding: 10px; border-radius: 5px; border: 1px solid #b3d7ff;">
-            <label style="color: #004085;">📎 แนบรูปสลิป (เลือกได้หลายรูป)</label>
+            <label style="color: #004085;">📎 แนบรูปสลิป (ตรวจสอบยอดอัตโนมัติ)</label>
             
             <div id="old-slip-section" style="display:none; margin-bottom:10px;">
                  <small style="color:red;">* มีสลิปเดิมอยู่แล้ว (ถ้าไม่เลือกใหม่จะใช้รูปนี้)</small>
@@ -216,9 +225,9 @@
         <div class="form-group">
             <label>รูปแบบการชำระ</label>
             <select id="in-pay-method" onchange="saveHistory()">
-            <option value="เงินสด">💵 เงินสด</option>
             <option value="โอน">🏦 โอน</option>
             <option value="โอนร้าน">🏪 โอนร้าน</option>
+			<option value="เงินสด">💵 เงินสด</option>
             </select>
         </div>
         
@@ -358,13 +367,14 @@
     </div>
 
     <script>
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwJClL6DPsTSWPdi0y-o0QYGchnSZHOmVDZ2CA8ww46oJKm7pdh0FQeCUwgu9xA1lzu8w/exec"; 
+        // ⚠️ เปลี่ยน URL นี้เป็นของ Web App คุณที่ Deploy แล้ว
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzPwDbc_UL888wwhQNdFMOzAqiMvI9aizvrCgADfgt-6nmx6IT7jfoSTnX82o4LVLlPzg/exec"; 
         
-        var isEditMode = false; // ตัวแปรบอกสถานะว่ากำลังแก้ไขอยู่หรือไม่
+        var isEditMode = false; 
+        var currentTransRef = ""; // ตัวแปรเก็บค่า Ref จากธนาคาร
 
         function toggleActionPopup() { const p = document.getElementById('action-popup'); p.style.display = (p.style.display==='block')?'none':'block'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
         
-        // --- ฟังก์ชั่นค้นหาและโหลดข้อมูลมาแก้ไข ---
         function searchBillToEdit() {
             const book = document.getElementById('search-book').value;
             const no = document.getElementById('search-no').value;
@@ -373,7 +383,6 @@
             const btn = document.querySelector('.btn-search'); 
             const oldTxt = btn.innerText; btn.innerText="🔍.."; btn.disabled=true;
             
-            // เรียก GAS action=findBill
             fetch(`${googleScriptUrl}?action=findBill&book=${book}&no=${no}`)
             .then(r=>r.json())
             .then(d => {
@@ -392,7 +401,6 @@
             document.getElementById('mode-indicator').innerHTML = `<span class="mode-badge mode-edit">สถานะ: แก้ไขข้อมูล (Update Mode)</span>`;
             document.getElementById('btn-cancel-edit').style.display = 'block';
             
-            // ล็อกเล่มที่/เลขที่ ไม่ให้เปลี่ยนตอนแก้ไข
             document.getElementById('in-book').readOnly = true;
             document.getElementById('in-no').readOnly = true;
 
@@ -416,24 +424,19 @@
             document.getElementById('in-receiver').value = data.receiver || "";
             document.getElementById('in-pay-method').value = data.payMethod || "เงินสด";
 
-            // Handle Slip Image (ถ้ามี)
             const oldSlipSection = document.getElementById('old-slip-section');
             const paperContainer = document.getElementById('slip-container-paper');
             const paperGallery = document.getElementById('slip-gallery');
             
-            // Reset files
             document.getElementById('in-slip-file').value = "";
             document.getElementById('slip-preview-container').innerHTML = "";
             paperGallery.innerHTML = "";
 
             if(data.slipImage && data.slipImage !== "") {
                 oldSlipSection.style.display = 'block';
-                // ถ้าเป็น Base64 ใส่ header data:image/jpeg;base64, ลงไป (ถ้า GAS ไม่ได้ส่งมาให้ต้องเติมเอง)
-                // สมมติ GAS ส่งมาแค่ string base64 เพียวๆ
                 let src = data.slipImage.startsWith('http') ? data.slipImage : "data:image/jpeg;base64," + data.slipImage;
                 document.getElementById('old-slip-img').src = src;
                 
-                // Show on paper as well
                 paperContainer.style.display = 'flex';
                 const img = document.createElement('img');
                 img.src = src;
@@ -444,7 +447,6 @@
                 paperContainer.style.display = 'none';
             }
 
-            // Sync all fields to preview
             sync('contract-no'); sync('no'); sync('shop-name'); sync('customer');
             sync('product-name'); sync('period'); sync('rem-month'); sync('due-date'); sync('receiver'); sync('security-ref');
             formatDate(document.getElementById('in-date').value);
@@ -454,23 +456,23 @@
             formatMoney(document.getElementById('in-rem-amount'));
             toggleType();
 
-            alert("📝 โหลดข้อมูลมาแก้ไขแล้ว กด 'บันทึก' เพื่อทับข้อมูลเดิม");
+            alert("📝 โหลดข้อมูลมาแก้ไขแล้ว");
         }
 
         function resetToNewMode() {
             isEditMode = false;
+            currentTransRef = ""; // Clear Ref
             document.getElementById('mode-indicator').innerHTML = `<span class="mode-badge mode-new">สถานะ: สร้างบิลใหม่</span>`;
             document.getElementById('btn-cancel-edit').style.display = 'none';
-            document.getElementById('in-book').readOnly = true; // ยังคงเป็น readonly (auto)
-            document.getElementById('in-no').readOnly = false; // ให้แก้ได้เผื่ออยากแก้
+            document.getElementById('in-book').readOnly = true; 
+            document.getElementById('in-no').readOnly = false; 
             document.getElementById('old-slip-section').style.display = 'none';
             document.getElementById('slip-container-paper').style.display = 'none';
             document.getElementById('slip-gallery').innerHTML = '';
             
-            // Clear inputs
             document.querySelectorAll('input:not(.readonly-field)').forEach(i => i.value = "");
             generateSecurityCode();
-            fetchNextBillNo(); // กลับไปเลขล่าสุด
+            fetchNextBillNo(); 
             alert("🔄 กลับสู่โหมดสร้างบิลใหม่");
         }
 
@@ -510,7 +512,7 @@
             }
         }
         function fetchNextBillNo() {
-            if(isEditMode) return; // Edit mode ไม่ต้องดึงเลขใหม่
+            if(isEditMode) return; 
             const book = document.getElementById('in-book').value; if(!book) return;
             fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`).then(r=>r.json()).then(d=>{ if(d.status==='success'){ document.getElementById('in-no').value=d.nextNo; sync('no'); }});
         }
@@ -523,7 +525,7 @@
     
             html2canvas(document.getElementById("bill-paper"), {scale:2,useCORS:true}).then(async c=>{
                 const p = {
-                    action: isEditMode ? 'updateData' : 'saveData', // เปลี่ยน Action ตามโหมด
+                    action: isEditMode ? 'updateData' : 'saveData', 
                     book:document.getElementById('in-book').value, 
                     no:document.getElementById('in-no').value,
                     ref:document.getElementById('in-security-ref').value, 
@@ -542,15 +544,11 @@
                     receiver:document.getElementById('in-receiver').value,
                     payMethod: document.getElementById('in-pay-method').value, 
                     receiptImage:c.toDataURL("image/jpeg",0.8).split(',')[1], 
-                    slipImage:"" // Default empty
+                    slipImage:"", 
+                    transRef: currentTransRef // ✅ ส่งค่า TransRef ไปบันทึก
                 };
         
                 const f = document.getElementById('in-slip-file');
-                
-                // Logic รูปสลิป:
-                // 1. ถ้ามีการเลือกไฟล์ใหม่ -> ใช้ไฟล์ใหม่ (รวมรูปแล้วส่ง)
-                // 2. ถ้าไม่มีไฟล์ใหม่ แต่เป็น Edit Mode -> ส่งค่า "KEEP" เพื่อบอก Backend ว่าใช้รูปเดิม
-                // 3. ถ้าไม่มีไฟล์ใหม่ และไม่ใช่ Edit Mode -> ส่งว่าง
                 
                 if(f.files.length > 0) {
                     try {
@@ -563,7 +561,6 @@
                     }
                 } else {
                     if(isEditMode) {
-                        // เช็คว่ามีรูปเดิมโชว์อยู่ไหม ถ้ามีให้ส่ง KEEP
                         const oldImg = document.getElementById('old-slip-img').getAttribute('src');
                         if(oldImg && oldImg !== "") {
                             p.slipImage = "KEEP"; 
@@ -600,12 +597,12 @@
             fetch(googleScriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
             .then(()=>{ 
                 alert(isEditMode ? '✅ แก้ไขข้อมูลเรียบร้อย!' : '✅ บันทึกสำเร็จ!'); 
-                if(isEditMode) resetToNewMode(); // แก้เสร็จกลับไปโหมดปกติ
+                if(isEditMode) resetToNewMode(); 
                 else { 
-                   // ถ้าบันทึกใหม่เสร็จ ให้เคลียร์แค่เลขที่ แล้วรันเลขใหม่
                    fetchNextBillNo();
                    document.getElementById('in-slip-file').value = "";
                    document.getElementById('slip-preview-container').innerHTML="";
+                   currentTransRef = ""; // Clear Ref
                 }
                 b.innerHTML=t; b.disabled=false; 
             })
@@ -614,20 +611,16 @@
         
         function saveAsImage() {
             const p = document.getElementById("bill-paper"); const s = document.getElementById('slip-container-paper'); const d = s.style.display; 
-            // ตอน save รูป ถ้ามีรูปเก่าอยู่แต่ไม่ได้ upload ใหม่ ให้คงการแสดงผลไว้
-            // แต่ function นี้มันซ่อน s ไว้ก่อน แล้ว capture แล้วค่อยแสดงใหม่ ซึ่งถ้า html2canvas ทำงานถูกก็โอเค
-            // ปรับ compact mode
             p.classList.add('compact-mode');
-            // กรณี Edit Mode แล้วมีรูปเก่า มันจะ display flex อยู่แล้ว html2canvas น่าจะเห็น
             html2canvas(p,{scale:2,backgroundColor:"#ffffff"}).then(c=>{
                 const l = document.createElement('a'); l.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
                 l.href = c.toDataURL("image/jpeg",0.9); l.click(); 
-                // คืนค่า display เดิม (ถ้ามันเคยโชว์ก็ให้โชว์)
                 s.style.display=d; 
                 p.classList.remove('compact-mode');
             });
         }
         
+        // --- 🔵 ฟังก์ชัน Preview & Scan QR Code ---
         function previewSlip(input) {
             const previewContainer = document.getElementById('slip-preview-container');
             const paperGallery = document.getElementById('slip-gallery');
@@ -636,28 +629,49 @@
 
             previewContainer.innerHTML = '';
             paperGallery.innerHTML = '';
+            currentTransRef = ""; // Reset ทุกครั้งที่เลือกรูปใหม่
 
             if (input.files && input.files.length > 0) {
-                // ถ้าเลือกรูปใหม่ ให้ซ่อนรูปเก่า
                 if(oldSlipSection) oldSlipSection.style.display = 'none';
-                
                 paperContainer.style.display = 'flex';
-                Array.from(input.files).forEach(file => {
+                
+                Array.from(input.files).forEach((file, index) => {
+                    // Create Wrapper
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'slip-check-wrapper';
+
+                    const img = document.createElement('img');
+                    img.className = 'slip-preview-item';
+                    
+                    const statusText = document.createElement('div');
+                    statusText.id = `slip-status-${index}`;
+                    statusText.className = 'slip-status status-checking';
+                    statusText.innerText = '⏳ กำลังสแกนหา QR...';
+
+                    wrapper.appendChild(img);
+                    wrapper.appendChild(statusText);
+                    previewContainer.appendChild(wrapper);
+
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        const img = document.createElement('img'); img.src = e.target.result; img.className = 'slip-preview-item'; previewContainer.appendChild(img);
-                        const imgPaper = document.createElement('img'); imgPaper.src = e.target.result; imgPaper.className = 'slip-paper-img';
+                        img.src = e.target.result;
+                        
+                        // Add to Paper
+                        const imgPaper = document.createElement('img'); 
+                        imgPaper.src = e.target.result; 
+                        imgPaper.className = 'slip-paper-img';
                         if(input.files.length > 1) imgPaper.classList.add('multi'); 
                         paperGallery.appendChild(imgPaper);
+
+                        // Start Analysis
+                        analyzeSlip(file, e.target.result, index);
                     };
                     reader.readAsDataURL(file);
                 });
             } else {
-                // ถ้า cancel เลือกไฟล์ ให้ดูว่ามีรูปเก่าไหม
                 if(isEditMode && document.getElementById('old-slip-img').src) {
                     oldSlipSection.style.display = 'block';
                     paperContainer.style.display = 'flex';
-                    // Restore old image to paper
                     const oldSrc = document.getElementById('old-slip-img').src;
                     const imgPaper = document.createElement('img'); imgPaper.src = oldSrc; imgPaper.className = 'slip-paper-img';
                     paperGallery.appendChild(imgPaper);
@@ -665,6 +679,71 @@
                     paperContainer.style.display = 'none';
                 }
             }
+        }
+        
+        // --- 🔵 ฟังก์ชันตรวจสอบสลิป ---
+        function analyzeSlip(file, base64Url, index) {
+            const statusEl = document.getElementById(`slip-status-${index}`);
+            
+            // ดึงจำนวนเงิน
+            let amountRaw = document.getElementById('in-amount').value;
+            let amountInput = amountRaw ? parseFloat(amountRaw.replace(/,/g, '')) : 0;
+            
+            if(!amountInput || amountInput === 0) {
+                statusEl.innerHTML = "<span style='color:red;'>⚠️ กรุณากรอก 'จำนวนเงิน' ด้านบนก่อนแนบสลิป!</span>";
+                return;
+            }
+
+            const img = new Image();
+            img.src = base64Url;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                context.drawImage(img, 0, 0, img.width, img.height);
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // อ่าน QR Code (jsQR)
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    statusEl.className = 'slip-status status-checking';
+                    statusEl.innerText = "🔄 พบ QR Code.. กำลังเช็คยอดกับธนาคาร..";
+                    checkSlipWithServer(code.data, amountInput, statusEl);
+                } else {
+                    statusEl.className = 'slip-status status-fail';
+                    statusEl.innerText = "⚠️ ไม่พบ QR Code (ระบบเช็คไม่ได้)";
+                }
+            };
+        }
+
+        function checkSlipWithServer(qrData, amount, statusEl) {
+            // เรียก GAS action=checkSlip
+            fetch(`${googleScriptUrl}?action=checkSlip&qr=${encodeURIComponent(qrData)}&amount=${amount}`)
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'valid') {
+                    statusEl.className = 'slip-status status-pass';
+                    statusEl.innerHTML = d.message; 
+                    currentTransRef = d.transRef; // ✅ จำค่าไว้ส่งตอนบันทึก
+                } else if (d.status === 'fraud-amount') {
+                    statusEl.className = 'slip-status status-fail';
+                    statusEl.innerHTML = d.message;
+                    alert("🚨 แจ้งเตือน: ยอดเงินในสลิปไม่ตรงกับที่กรอก!");
+                } else if (d.status === 'duplicate') {
+                    statusEl.className = 'slip-status status-fail';
+                    statusEl.innerHTML = d.message;
+                    alert("🚨 " + d.message);
+                } else {
+                    statusEl.className = 'slip-status status-fail';
+                    statusEl.innerHTML = d.message;
+                }
+            })
+            .catch(e => {
+                statusEl.innerText = "Error Connecting Server";
+                console.error(e);
+            });
         }
         
         function handleSignatureUpload(i) { if(i.files[0]) { const r=new FileReader(); r.onload=e=>{ document.getElementById('out-sig-img').src=e.target.result; document.getElementById('out-sig-img').style.display='block'; }; r.readAsDataURL(i.files[0]); } }
@@ -691,7 +770,6 @@
         function saveHistory(){}
         function handleDateChange(d) {
             formatDate(d); if(!d)return; const dt=new Date(d), b=(dt.getFullYear()+543).toString().substr(2,2)+(dt.getMonth()+1).toString().padStart(2,'0'), old=document.getElementById('in-book').value;
-            // ถ้า Edit Mode ห้ามเปลี่ยนเล่ม
             if(!isEditMode) {
                  document.getElementById('in-book').value=b; document.getElementById('out-book').innerText=b; 
                  if(old!==b) fetchNextBillNo();
