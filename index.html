@@ -612,9 +612,9 @@
         const c_no = document.getElementById('in-contract-no').value; // ดึงเลขที่สัญญาจากช่องกรอก
 
         if (c_no) {
-            // เปิดหน้าสัญญาขึ้นมาทำงานเบื้องหลังเพื่อ Render ไฟล์ใหม่
-            window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`, 
-                        'AutoUpdater', 'width=100,height=100,left=-1000,top=-1000');
+            // ✅ ปรับขนาดให้กว้างอย่างน้อย 1000px เพื่อให้ Browser ยอมวาดหน้าจอ
+window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`, 
+            'AutoUpdater', 'width=1200,height=800,left=0,top=0');
         }
         // ----------------------------------------------------
 
