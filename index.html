@@ -382,7 +382,10 @@
             const btn = document.querySelector('.btn-search'); 
             const oldTxt = btn.innerText; btn.innerText="🔍.."; btn.disabled=true;
             
-            fetch(`${googleScriptUrl}?action=findBill&book=${book}&no=${no}`)
+            fetch(`${googleScriptUrl}?action=findBill&book=${book}&no=${no}`, {
+    method: 'GET',
+    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
+})
             .then(r=>r.json())
             .then(d => {
                 if(d.status === 'success') {
@@ -478,7 +481,10 @@
             const cNo = document.getElementById('import-contract-no').value;
             if(!cNo) return alert("กรุณากรอกเลขสัญญา");
             const btn = document.querySelector('.btn-import'); const old = btn.innerText; btn.innerText="⏳.."; btn.disabled=true;
-            fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`).then(r=>r.json()).then(d=>{
+            fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`, {
+    method: 'GET',
+    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
+}).then(r=>r.json()).then(d=>{
                 if(d.status==='success') {
                     document.getElementById('in-contract-no').value = d.c_no;
                     document.getElementById('in-customer').value = d.b_name; 
@@ -512,7 +518,10 @@
         function fetchNextBillNo() {
             if(isEditMode) return; 
             const book = document.getElementById('in-book').value; if(!book) return;
-            fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`)
+            fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`, {
+    method: 'GET',
+    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
+})
             .then(r=>r.json())
             .then(d=>{ 
                 if(d.status==='success'){ 
@@ -592,10 +601,9 @@
         function sendData(p, b, t) { 
     fetch(googleScriptUrl, {
         method: 'POST',
-        mode: 'no-cors',
-        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(p)
     })
+    .then(r => r.json()) // เพิ่มบรรทัดนี้เพื่ออ่านค่า JSON
     .then(() => { 
         alert(isEditMode ? '✅ แก้ไขข้อมูลเรียบร้อย!' : '✅ บันทึกใบเสร็จสำเร็จ!'); 
         
