@@ -368,7 +368,7 @@
         // -------------------------------------------------------------
         // ⚙️ CONFIG & API SETUP
         // -------------------------------------------------------------
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwSKtn2oUq2ZUVhPaod7NpoqDkm3-P3NQ3dlHftPHvTmUPot0WM_Zs0JVdnazqTIu7f/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzrP1CQN-wrGXNb-3Tf2K6lKxnqhGjd2VVmn4qrGgmApKFEC-cyY6sfosCqjKsKk5PK/exec"; 
         const SLIP_API_KEY = "cc337cb2-f35b-40b1-a92d-0ed556755722";
 
         var isEditMode = false; 
@@ -685,15 +685,22 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             });
         }
         
+        // ตัวแปรสำหรับรวมยอดเงินจากหลายสลิป
+        var totalSlipAmount = 0;
+
         function previewSlip(input) {
             const previewContainer = document.getElementById('slip-preview-container');
             const paperGallery = document.getElementById('slip-gallery');
             const paperContainer = document.getElementById('slip-container-paper');
             const oldSlipSection = document.getElementById('old-slip-section');
 
+            // 🟢 รีเซ็ตค่าทุกครั้งที่เลือกไฟล์ใหม่
             previewContainer.innerHTML = '';
             paperGallery.innerHTML = '';
             currentTransRef = ""; 
+            totalSlipAmount = 0; // รีเซ็ตยอดรวม
+            document.getElementById('in-amount').value = ""; // ล้างช่องจำนวนเงินรอไว้
+            sync('amount');
 
             if (input.files && input.files.length > 0) {
                 if(oldSlipSection) oldSlipSection.style.display = 'none';
@@ -742,37 +749,29 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
         }
         
         // -------------------------------------------------------------
-        // ✅ FIXED: ตรวจสลิป (ซ้ำ/ชื่อตรวจแยก/ยอด) + ดึงวันที่อัตโนมัติ
-        // -------------------------------------------------------------
-        // -------------------------------------------------------------
-        // ✅ FIXED: analyzeSlip (ดึงวันที่จากสลิปมาใส่บิลอัตโนมัติ)
+        // ✅ FIXED: ดึงยอดจากสลิป (Auto Fill) + ตรวจเทียบงวดละ
         // -------------------------------------------------------------
         function analyzeSlip(base64Url, index) {
             const statusEl = document.getElementById(`slip-status-${index}`);
-            let amountRaw = document.getElementById('in-amount').value;
             let verifyName = document.getElementById('in-verify-name').value;
-            let amountInput = amountRaw ? parseFloat(amountRaw.replace(/,/g, '')) : 0;
             
-            if(!amountInput || amountInput === 0) {
-                statusEl.innerHTML = "<span style='color:red;'>⚠️ กรอกยอดเงินก่อน</span>";
-                return;
-            }
-
+            // 🟢 ดึงค่างวด (งวดละ) มาเป็นตัวอ้างอิง (Reference)
+            let remAmountRaw = document.getElementById('in-rem-amount').value;
+            let expectedAmount = remAmountRaw ? parseFloat(remAmountRaw.replace(/,/g, '')) : 0;
+            
             statusEl.className = 'slip-status status-checking';
-            statusEl.innerText = "⏳ กำลังตรวจสอบ...";
+            statusEl.innerText = "⏳ กำลังดึงยอดและตรวจสอบ...";
 
             const img = new Image();
             img.src = base64Url;
             img.onload = function() {
                 const maxDim = 1000;
-                let w = img.width;
-                let h = img.height;
+                let w = img.width; let h = img.height;
                 if (w > h) { if (w > maxDim) { h *= maxDim / w; w = maxDim; } } 
                 else { if (h > maxDim) { w *= maxDim / h; h = maxDim; } }
 
                 const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
+                canvas.width = w; canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
                 const resizedBase64 = canvas.toDataURL("image/jpeg", 0.7).split(',')[1];
@@ -783,41 +782,45 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
                     body: JSON.stringify({
                         action: 'checkSlip',
                         image: resizedBase64,
-                        amount: amountInput,
+                        expectedAmount: expectedAmount, // 🟢 ส่งค่างวดไปให้ backend ตรวจเทียบ
                         verifyName: verifyName,
                         apiKey: SLIP_API_KEY 
                     })
                 })
                 .then(response => response.json())
                 .then(d => {
-                    if (d.status === 'valid') {
-                        statusEl.className = 'slip-status status-pass';
-                        statusEl.innerText = d.message; 
-                        currentTransRef = d.transRef; 
-
-                        // 🟢 ส่วนสำคัญ: ดึงวันที่จากสลิปมาใส่ช่องวันที่บิล
-                        if (d.transDate) {
-                            const slipDate = new Date(d.transDate);
-                            const y = slipDate.getFullYear();
-                            const m = String(slipDate.getMonth() + 1).padStart(2, '0');
-                            const day = String(slipDate.getDate()).padStart(2, '0');
-                            const dateStr = `${y}-${m}-${day}`; // จัดฟอร์แมต YYYY-MM-DD
-
-                            // อัปเดตช่องวันที่
-                            const dateInput = document.getElementById('in-date');
-                            if (dateInput.value !== dateStr) {
-                                dateInput.value = dateStr;
-                                handleDateChange(dateStr); // สั่งให้หน้าบิลเปลี่ยนวันที่ตาม
-                                // alert("📅 ปรับวันที่ใบเสร็จเป็น " + dateStr + " ตามสลิปแล้ว");
+                    // กรณีผ่าน หรือ กรณีผ่านแต่ยอดไม่ตรงงวด (อนุโลมให้รวมยอดได้ แต่ขึ้นเตือน)
+                    if (d.status === 'valid' || d.status === 'amount-mismatch') {
+                        
+                        // 🟢 รวมยอดเงิน (Accumulate Amount)
+                        if (d.actualAmount) {
+                            totalSlipAmount += parseFloat(d.actualAmount);
+                            
+                            // อัปเดตช่องจำนวนเงินอัตโนมัติ
+                            let amountInput = document.getElementById('in-amount');
+                            amountInput.value = totalSlipAmount;
+                            formatMoney(amountInput); // จัดฟอร์แมตลูกน้ำ
+                            
+                            // อัปเดตวันที่ (ใช้วันที่ของสลิปล่าสุด)
+                            if (d.transDate) {
+                                const slipDate = new Date(d.transDate);
+                                const dateStr = `${slipDate.getFullYear()}-${String(slipDate.getMonth() + 1).padStart(2, '0')}-${String(slipDate.getDate()).padStart(2, '0')}`;
+                                document.getElementById('in-date').value = dateStr;
+                                handleDateChange(dateStr);
                             }
                         }
-                        
+
+                        if (d.status === 'amount-mismatch') {
+                            statusEl.className = 'slip-status status-fail'; // สีส้ม/แดงเตือน
+                            statusEl.innerHTML = `⚠️ ยอด ${d.actualAmount.toLocaleString()} ไม่ตรงงวด (${expectedAmount.toLocaleString()})`;
+                        } else {
+                            statusEl.className = 'slip-status status-pass';
+                            statusEl.innerText = d.message; 
+                            currentTransRef = d.transRef; 
+                        }
+
                         if(d.message.includes("ชื่อไม่ตรง")) alert(d.message);
 
-                    } else if (d.status === 'fraud-amount') {
-                        statusEl.className = 'slip-status status-fail';
-                        statusEl.innerHTML = d.message;
-                        alert(d.message);
                     } else if (d.status === 'duplicate_db') {
                         statusEl.className = 'slip-status status-fail';
                         statusEl.innerHTML = "🚨 สลิปซ้ำ";
