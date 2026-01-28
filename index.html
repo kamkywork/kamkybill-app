@@ -363,7 +363,7 @@
         // -------------------------------------------------------------
         // ⚙️ CONFIG & API SETUP
         // -------------------------------------------------------------
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzAGL9yrh56rV3mBlZ9REFC9kXVNKdvDJVMJ3ILseXYACy1iI7kblLTC0NCQ68v-Uqr/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbyr2sXxpLdoXLfHiTMT-l8UIybXW0yQrpbwVoVVIneWxpNywuCNyklqjFr-V4zyBOg/exec"; 
         const SLIP_API_KEY = "cc337cb2-f35b-40b1-a92d-0ed556755722";
 
         var isEditMode = false; 
@@ -532,6 +532,9 @@
             });
         }
         
+        // -------------------------------------------------------------
+        // ✅ แก้ไข: จับภาพ 2 ครั้ง (ย่อ = Clean, เต็ม = Full)
+        // -------------------------------------------------------------
         function submitToDatabase() {
             if(!googleScriptUrl) return alert("URL Error");
             const btn = document.querySelector('.btn-sub-cloud'); 
@@ -539,62 +542,84 @@
             btn.innerHTML = isEditMode ? "⏳ กำลังแก้ไขและอัปเดต..." : "⏳ กำลังบันทึกและอัปเดต..."; 
             btn.disabled = true;
     
+            const paper = document.getElementById("bill-paper");
             const slipContainer = document.getElementById('slip-container-paper');
             const hasSlips = document.getElementById('slip-gallery').children.length > 0;
-            if(hasSlips) { slipContainer.style.display = 'flex'; }
+            
+            // เก็บสถานะการแสดงผลเดิม
+            const originalSlipDisplay = slipContainer.style.display;
 
-            html2canvas(document.getElementById("bill-paper"), {scale:2, useCORS:true}).then(async canvas => {
-                const p = {
-                    action: isEditMode ? 'updateData' : 'saveData', 
-                    includeContractUpdate: true,  
-                    apiKey: SLIP_API_KEY,         
+            // ---------------------------------------------------------
+            // 📸 STEP 1: จับภาพแบบ "ย่อ" (Clean Bill - ไม่มีสลิป)
+            // ---------------------------------------------------------
+            slipContainer.style.display = 'none';
+            paper.classList.add('compact-mode');
 
-                    book: document.getElementById('in-book').value, 
-                    no: document.getElementById('in-no').value,
-                    ref: document.getElementById('in-security-ref').value, 
+            html2canvas(paper, {scale:2, useCORS:true}).then(async cleanCanvas => {
+                const cleanBase64 = cleanCanvas.toDataURL("image/jpeg", 0.8).split(',')[1];
+
+                // ---------------------------------------------------------
+                // 📸 STEP 2: จับภาพแบบ "เต็ม" (Full Bill - มีสลิป)
+                // ---------------------------------------------------------
+                paper.classList.remove('compact-mode');
+                if(hasSlips) { slipContainer.style.display = 'flex'; }
+
+                html2canvas(paper, {scale:2, useCORS:true}).then(async fullCanvas => {
+                    const fullBase64 = fullCanvas.toDataURL("image/jpeg", 0.8).split(',')[1];
+
+                    const p = {
+                        action: isEditMode ? 'updateData' : 'saveData', 
+                        includeContractUpdate: true,  
+                        apiKey: SLIP_API_KEY,         
+
+                        book: document.getElementById('in-book').value, 
+                        no: document.getElementById('in-no').value,
+                        ref: document.getElementById('in-security-ref').value, 
+                        
+                        dateISO: document.getElementById('in-date').value, 
+                        date: convertDateToThaiShort(document.getElementById('in-date').value),
+                        
+                        contractNo: document.getElementById('in-contract-no').value, 
+                        shopName: document.getElementById('in-shop-name').value,
+                        shopPhone: document.getElementById('in-shop-phone').value, 
+                        customer: document.getElementById('in-customer').value,
+                        product: document.getElementById('in-product-name').value, 
+                        period: document.getElementById('in-period').value || "-", 
+                        amount: document.getElementById('in-amount').value, 
+                        remMonth: document.getElementById('in-rem-month').value,
+                        remAmount: document.getElementById('in-rem-amount').value, 
+                        dueDate: document.getElementById('in-due-date').value,
+                        startDate: document.getElementById('in-start-date').value, 
+                        receiver: document.getElementById('in-receiver').value,
+                        payMethod: document.getElementById('in-pay-method').value, 
+                        
+                        receiptImage: fullBase64,       // ส่งแบบเต็มไป (สำหรับเก็บประวัติหลัก)
+                        cleanReceiptImage: cleanBase64, // ✅ ส่งแบบย่อไป (สำหรับ Export Center)
+                        slipImage: "", 
+                        transRef: currentTransRef 
+                    };
+            
+                    const f = document.getElementById('in-slip-file');
                     
-                    dateISO: document.getElementById('in-date').value, 
-                    date: convertDateToThaiShort(document.getElementById('in-date').value),
-                    
-                    contractNo: document.getElementById('in-contract-no').value, 
-                    shopName: document.getElementById('in-shop-name').value,
-                    shopPhone: document.getElementById('in-shop-phone').value, 
-                    customer: document.getElementById('in-customer').value,
-                    product: document.getElementById('in-product-name').value, 
-                    period: document.getElementById('in-period').value || "-", 
-                    amount: document.getElementById('in-amount').value, 
-                    remMonth: document.getElementById('in-rem-month').value,
-                    remAmount: document.getElementById('in-rem-amount').value, 
-                    dueDate: document.getElementById('in-due-date').value,
-                    startDate: document.getElementById('in-start-date').value, 
-                    receiver: document.getElementById('in-receiver').value,
-                    payMethod: document.getElementById('in-pay-method').value, 
-                    
-                    receiptImage: canvas.toDataURL("image/jpeg", 0.8).split(',')[1], 
-                    slipImage: "", 
-                    transRef: currentTransRef 
-                };
-        
-                const f = document.getElementById('in-slip-file');
-                
-                if(f.files.length > 0) {
-                    try {
-                        const mergedBase64 = await mergeImagesAndGetBase64(f.files);
-                        p.slipImage = mergedBase64.split(',')[1];
-                        sendData(p, btn, oldText);
-                    } catch(err) {
-                        alert("Error merging images: " + err);
-                        btn.innerHTML = oldText; btn.disabled = false;
-                    }
-                } else {
-                    if(isEditMode) {
-                        const oldImg = document.getElementById('old-slip-img').getAttribute('src');
-                        if(oldImg && oldImg !== "") {
-                            p.slipImage = "KEEP"; 
+                    if(f.files.length > 0) {
+                        try {
+                            const mergedBase64 = await mergeImagesAndGetBase64(f.files);
+                            p.slipImage = mergedBase64.split(',')[1];
+                            sendData(p, btn, oldText);
+                        } catch(err) {
+                            alert("Error merging images: " + err);
+                            btn.innerHTML = oldText; btn.disabled = false;
                         }
+                    } else {
+                        if(isEditMode) {
+                            const oldImg = document.getElementById('old-slip-img').getAttribute('src');
+                            if(oldImg && oldImg !== "") {
+                                p.slipImage = "KEEP"; 
+                            }
+                        }
+                        sendData(p, btn, oldText); 
                     }
-                    sendData(p, btn, oldText); 
-                }
+                });
             });
         }
         
