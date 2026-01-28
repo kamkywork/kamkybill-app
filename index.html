@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ระบบออกใบเสร็จรับเงิน (Auto RefID + Col O/T Support + Resize Fix)</title>
+    <title>ระบบออกใบเสร็จรับเงิน (Verify Name Separate)</title>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Courier+Prime:wght@400&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
@@ -122,7 +122,12 @@
                 <button class="btn-import" onclick="importFromContract()">ดึงข้อมูล</button>
             </div>
         </div>
-
+        
+        <div class="form-group" style="background: #e3f2fd; padding: 10px; border-radius: 5px; border: 1px solid #90caf9;">
+            <label style="color: #1565c0;">🏦 ชื่อบัญชีรับเงิน (สำหรับตรวจสลิป)</label>
+            <input type="text" id="in-verify-name" placeholder="ระบุชื่อบัญชีที่ตรงกับสลิป">
+            <small style="color:#666; font-size:0.8em;">* ใช้ตรวจสอบเท่านั้น ไม่แสดงในใบเสร็จ</small>
+        </div>
         <div class="form-group">
             <label>รหัสอ้างอิง (Auto) <small style="color:blue;">*บันทึกลง Col O</small></label>
             <input type="text" id="in-security-ref" class="readonly-field" readonly>
@@ -155,7 +160,7 @@
         
         <hr>
         <div class="form-group">
-            <label>ชื่อร้านค้าตัวแทน</label>
+            <label>ชื่อร้านค้าตัวแทน (แสดงในบิล)</label>
             <input type="text" id="in-shop-name" oninput="saveHistory(); sync('shop-name')">
         </div>
         <div class="form-group">
@@ -363,7 +368,7 @@
         // -------------------------------------------------------------
         // ⚙️ CONFIG & API SETUP
         // -------------------------------------------------------------
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbyr2sXxpLdoXLfHiTMT-l8UIybXW0yQrpbwVoVVIneWxpNywuCNyklqjFr-V4zyBOg/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbwSKtn2oUq2ZUVhPaod7NpoqDkm3-P3NQ3dlHftPHvTmUPot0WM_Zs0JVdnazqTIu7f/exec"; 
         const SLIP_API_KEY = "cc337cb2-f35b-40b1-a92d-0ed556755722";
 
         var isEditMode = false; 
@@ -737,52 +742,49 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
         }
         
         // -------------------------------------------------------------
-        // ✅ FIXED: เพิ่มการย่อรูป (Resize) ก่อนส่ง API เพื่อแก้ปัญหา Unknown Error
+        // ✅ FIXED: ตรวจสลิป (ซ้ำ/ชื่อตรวจแยก/ยอด) + ดึงวันที่อัตโนมัติ
+        // -------------------------------------------------------------
+        // -------------------------------------------------------------
+        // ✅ FIXED: analyzeSlip (ดึงวันที่จากสลิปมาใส่บิลอัตโนมัติ)
         // -------------------------------------------------------------
         function analyzeSlip(base64Url, index) {
             const statusEl = document.getElementById(`slip-status-${index}`);
             let amountRaw = document.getElementById('in-amount').value;
+            let verifyName = document.getElementById('in-verify-name').value;
             let amountInput = amountRaw ? parseFloat(amountRaw.replace(/,/g, '')) : 0;
             
             if(!amountInput || amountInput === 0) {
-                statusEl.innerHTML = "<span style='color:red;'>⚠️ กรอกยอดเงินก่อนแนบสลิป</span>";
+                statusEl.innerHTML = "<span style='color:red;'>⚠️ กรอกยอดเงินก่อน</span>";
                 return;
             }
 
             statusEl.className = 'slip-status status-checking';
-            statusEl.innerText = "⏳ กำลังย่อไฟล์และส่งตรวจ...";
+            statusEl.innerText = "⏳ กำลังตรวจสอบ...";
 
-            // --- เริ่มกระบวนการย่อรูป (Resize Image) ---
             const img = new Image();
             img.src = base64Url;
             img.onload = function() {
-                const maxDim = 1000; // กำหนดด้านกว้าง/สูง ไม่เกิน 1000px
+                const maxDim = 1000;
                 let w = img.width;
                 let h = img.height;
-
-                if (w > h) {
-                    if (w > maxDim) { h *= maxDim / w; w = maxDim; }
-                } else {
-                    if (h > maxDim) { w *= maxDim / h; h = maxDim; }
-                }
+                if (w > h) { if (w > maxDim) { h *= maxDim / w; w = maxDim; } } 
+                else { if (h > maxDim) { w *= maxDim / h; h = maxDim; } }
 
                 const canvas = document.createElement('canvas');
                 canvas.width = w;
                 canvas.height = h;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, w, h);
-
-                // แปลงกลับเป็น Base64 แบบลดคุณภาพ (Quality 0.7)
                 const resizedBase64 = canvas.toDataURL("image/jpeg", 0.7).split(',')[1];
 
-                // --- ส่งข้อมูลที่ย่อแล้วไป Google Script ---
                 fetch(googleScriptUrl, {
                     method: 'POST',
                     headers: { "Content-Type": "text/plain" }, 
                     body: JSON.stringify({
                         action: 'checkSlip',
-                        image: resizedBase64, // ส่งตัวที่ย่อแล้ว
+                        image: resizedBase64,
                         amount: amountInput,
+                        verifyName: verifyName,
                         apiKey: SLIP_API_KEY 
                     })
                 })
@@ -790,12 +792,36 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
                 .then(d => {
                     if (d.status === 'valid') {
                         statusEl.className = 'slip-status status-pass';
-                        statusEl.innerHTML = d.message; 
+                        statusEl.innerText = d.message; 
                         currentTransRef = d.transRef; 
+
+                        // 🟢 ส่วนสำคัญ: ดึงวันที่จากสลิปมาใส่ช่องวันที่บิล
+                        if (d.transDate) {
+                            const slipDate = new Date(d.transDate);
+                            const y = slipDate.getFullYear();
+                            const m = String(slipDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(slipDate.getDate()).padStart(2, '0');
+                            const dateStr = `${y}-${m}-${day}`; // จัดฟอร์แมต YYYY-MM-DD
+
+                            // อัปเดตช่องวันที่
+                            const dateInput = document.getElementById('in-date');
+                            if (dateInput.value !== dateStr) {
+                                dateInput.value = dateStr;
+                                handleDateChange(dateStr); // สั่งให้หน้าบิลเปลี่ยนวันที่ตาม
+                                // alert("📅 ปรับวันที่ใบเสร็จเป็น " + dateStr + " ตามสลิปแล้ว");
+                            }
+                        }
+                        
+                        if(d.message.includes("ชื่อไม่ตรง")) alert(d.message);
+
                     } else if (d.status === 'fraud-amount') {
                         statusEl.className = 'slip-status status-fail';
                         statusEl.innerHTML = d.message;
-                        alert("🚨 ยอดเงินไม่ตรง: " + d.message);
+                        alert(d.message);
+                    } else if (d.status === 'duplicate_db') {
+                        statusEl.className = 'slip-status status-fail';
+                        statusEl.innerHTML = "🚨 สลิปซ้ำ";
+                        alert(d.message); 
                     } else {
                         statusEl.className = 'slip-status status-fail';
                         statusEl.innerHTML = d.message;
@@ -803,7 +829,6 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
                 })
                 .catch(e => {
                     statusEl.innerText = "Error: " + e.message;
-                    console.error("Fetch Error:", e);
                 });
             };
         }
@@ -871,6 +896,11 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             }
         }
         window.onload=function(){
+            // --- 🟢 ตั้งชื่อบัญชีสำหรับตรวจสลิปอัตโนมัติ (แก้ไขชื่อที่นี่) ---
+            const myVerifyName = "ณัฐพล เคหาบาล,NATHAPON KEH"; 
+            document.getElementById('in-verify-name').value = myVerifyName;
+            // -------------------------------------------------------------
+
             const t=new Date().toISOString().split('T')[0]; document.getElementById('in-date').value=t; handleDateChange(t); generateSecurityCode(); setTimeout(fetchNextBillNo,1000);
             const u = new URLSearchParams(window.location.search); const r = u.get('ref');
             if(r) { document.getElementById('import-contract-no').value=r; setTimeout(importFromContract,1500); }
