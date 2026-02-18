@@ -368,11 +368,12 @@
         // -------------------------------------------------------------
         // ⚙️ CONFIG & API SETUP
         // -------------------------------------------------------------
-        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzGT-D9JYq-hwLUofGYejY1ujApJpUxBWbUlh7Ob6QOyBKzZPcMKy89hrj3WXIhPDfD/exec"; 
+        var googleScriptUrl = "https://script.google.com/macros/s/AKfycbzY856dTYCjYyOqmrQwjns6-KNz-LdbouLTGGwj7IlD9Fjatzxsim1efHwXamjytOtS/exec"; 
         const SLIP_API_KEY = "cc337cb2-f35b-40b1-a92d-0ed556755722";
 
         var isEditMode = false; 
         var currentTransRef = ""; 
+        var contractUpdateWindow = null; 
 
         // -------------------------------------------------------------
         // 🛠️ UTILITY & MAIN LOGIC
@@ -389,7 +390,7 @@
             
             fetch(`${googleScriptUrl}?action=findBill&book=${book}&no=${no}`, {
     method: 'GET',
-    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
+    redirect: 'follow' 
 })
             .then(r=>r.json())
             .then(d => {
@@ -428,6 +429,8 @@
             document.getElementById('in-start-date').value = data.startDate ? data.startDate.split('T')[0] : "";
             document.getElementById('in-receiver').value = data.receiver || "";
             document.getElementById('in-pay-method').value = data.payMethod || "เงินสด";
+            
+            currentTransRef = data.transRef || ""; 
 
             const oldSlipSection = document.getElementById('old-slip-section');
             const paperContainer = document.getElementById('slip-container-paper');
@@ -488,10 +491,11 @@
             const btn = document.querySelector('.btn-import'); const old = btn.innerText; btn.innerText="⏳.."; btn.disabled=true;
             fetch(`${googleScriptUrl}?action=getContractData&c_no=${encodeURIComponent(cNo)}`, {
     method: 'GET',
-    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
+    redirect: 'follow' 
 }).then(r=>r.json()).then(d=>{
                 if(d.status==='success') {
                     document.getElementById('in-contract-no').value = d.c_no;
+                    // ตัดส่วน logic saleSelect ออก
                     document.getElementById('in-customer').value = d.b_name; 
                     document.getElementById('in-product-name').value = d.p_name;
                     document.getElementById('in-rem-amount').value = d.amount;
@@ -523,10 +527,11 @@
         function fetchNextBillNo() {
             if(isEditMode) return; 
             const book = document.getElementById('in-book').value; if(!book) return;
+            // ตัด Sale Code Logic ออก
             fetch(`${googleScriptUrl}?action=getLastNo&book=${book}`, {
-    method: 'GET',
-    redirect: 'follow' // ✅ เพิ่มเพื่อให้ตาม Redirect ของ Google
-})
+                method: 'GET',
+                redirect: 'follow' 
+            })
             .then(r=>r.json())
             .then(d=>{ 
                 if(d.status==='success'){ 
@@ -537,11 +542,18 @@
             });
         }
         
-        // -------------------------------------------------------------
-        // ✅ แก้ไข: จับภาพ 2 ครั้ง (ย่อ = Clean, เต็ม = Full)
-        // -------------------------------------------------------------
         function submitToDatabase() {
             if(!googleScriptUrl) return alert("URL Error");
+
+            // 🟢 เทคนิคแก้ Popup Block
+            const c_no = document.getElementById('in-contract-no').value;
+            if (c_no) {
+                contractUpdateWindow = window.open('', 'AutoUpdater', 'width=1200,height=800,left=0,top=0');
+                if (contractUpdateWindow) {
+                    contractUpdateWindow.document.write('<html><body style="background:#2c3e50; color:white; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><h2>⏳ กำลังเตรียมอัปเดตสัญญา...<br><small>กรุณาอย่าปิดหน้าต่างนี้</small></h2></body></html>');
+                }
+            }
+
             const btn = document.querySelector('.btn-sub-cloud'); 
             const oldText = btn.innerHTML; 
             btn.innerHTML = isEditMode ? "⏳ กำลังแก้ไขและอัปเดต..." : "⏳ กำลังบันทึกและอัปเดต..."; 
@@ -551,25 +563,18 @@
             const slipContainer = document.getElementById('slip-container-paper');
             const hasSlips = document.getElementById('slip-gallery').children.length > 0;
             
-            // เก็บสถานะการแสดงผลเดิม
             const originalSlipDisplay = slipContainer.style.display;
 
-            // ---------------------------------------------------------
-            // 📸 STEP 1: จับภาพแบบ "ย่อ" (Clean Bill - ไม่มีสลิป)
-            // ---------------------------------------------------------
             slipContainer.style.display = 'none';
             paper.classList.add('compact-mode');
 
-            html2canvas(paper, {scale:2, useCORS:true}).then(async cleanCanvas => {
+            html2canvas(paper, {scale:2, useCORS:true, windowWidth: 1200}).then(async cleanCanvas => {
                 const cleanBase64 = cleanCanvas.toDataURL("image/jpeg", 0.8).split(',')[1];
 
-                // ---------------------------------------------------------
-                // 📸 STEP 2: จับภาพแบบ "เต็ม" (Full Bill - มีสลิป)
-                // ---------------------------------------------------------
                 paper.classList.remove('compact-mode');
                 if(hasSlips) { slipContainer.style.display = 'flex'; }
 
-                html2canvas(paper, {scale:2, useCORS:true}).then(async fullCanvas => {
+                html2canvas(paper, {scale:2, useCORS:true, windowWidth: 1200}).then(async fullCanvas => {
                     const fullBase64 = fullCanvas.toDataURL("image/jpeg", 0.8).split(',')[1];
 
                     const p = {
@@ -598,8 +603,11 @@
                         receiver: document.getElementById('in-receiver').value,
                         payMethod: document.getElementById('in-pay-method').value, 
                         
-                        receiptImage: fullBase64,       // ส่งแบบเต็มไป (สำหรับเก็บประวัติหลัก)
-                        cleanReceiptImage: cleanBase64, // ✅ ส่งแบบย่อไป (สำหรับ Export Center)
+                        // ส่ง SaleCode ว่างเปล่า หรือ ตัดออก
+                        saleCode: "",
+
+                        receiptImage: fullBase64,       
+                        cleanReceiptImage: cleanBase64, 
                         slipImage: "", 
                         transRef: currentTransRef 
                     };
@@ -614,6 +622,7 @@
                         } catch(err) {
                             alert("Error merging images: " + err);
                             btn.innerHTML = oldText; btn.disabled = false;
+                            if(contractUpdateWindow) contractUpdateWindow.close();
                         }
                     } else {
                         if(isEditMode) {
@@ -629,42 +638,43 @@
         }
         
         function sendData(p, b, t) { 
-    fetch(googleScriptUrl, {
-        method: 'POST',
-        body: JSON.stringify(p)
-    })
-    .then(r => r.json()) // เพิ่มบรรทัดนี้เพื่ออ่านค่า JSON
-    .then(() => { 
-        alert(isEditMode ? '✅ แก้ไขข้อมูลเรียบร้อย!' : '✅ บันทึกใบเสร็จสำเร็จ!'); 
-        
-        // 🚀 --- ส่วนที่เพิ่มใหม่: สั่งอัปเดตไฟล์สัญญาอัตโนมัติ ---
-        const contractUrl = "https://kamkywork.github.io/kamkyloancontract-app/"; // ⚠️ เปลี่ยนเป็นลิงก์หน้าสัญญา (C.html) ของคุณ
-        const c_no = document.getElementById('in-contract-no').value; // ดึงเลขที่สัญญาจากช่องกรอก
+            fetch(googleScriptUrl, {
+                method: 'POST',
+                body: JSON.stringify(p)
+            })
+            .then(r => r.json()) 
+            .then(() => { 
+                alert(isEditMode ? '✅ แก้ไขข้อมูลเรียบร้อย!' : '✅ บันทึกใบเสร็จสำเร็จ!'); 
+                
+                const contractUrl = "https://kamkywork.github.io/kamkyloancontract-app/"; 
+                const c_no = document.getElementById('in-contract-no').value;
 
-        if (c_no) {
-            // ✅ ปรับขนาดให้กว้างอย่างน้อย 1000px เพื่อให้ Browser ยอมวาดหน้าจอ
-window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`, 
-            'AutoUpdater', 'width=1200,height=800,left=0,top=0');
-        }
-        // ----------------------------------------------------
+                if (c_no) {
+                    if (contractUpdateWindow) {
+                        contractUpdateWindow.location.href = `${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`;
+                    } else {
+                        window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`, 'AutoUpdater', 'width=1200,height=800');
+                    }
+                }
 
-        if(isEditMode) resetToNewMode(); 
-        else { 
-           fetchNextBillNo();
-           document.getElementById('in-slip-file').value = "";
-           document.getElementById('slip-preview-container').innerHTML="";
-           document.getElementById('slip-gallery').innerHTML="";
-           document.getElementById('slip-container-paper').style.display='none';
-           currentTransRef = ""; 
+                if(isEditMode) resetToNewMode(); 
+                else { 
+                    fetchNextBillNo();
+                    document.getElementById('in-slip-file').value = "";
+                    document.getElementById('slip-preview-container').innerHTML="";
+                    document.getElementById('slip-gallery').innerHTML="";
+                    document.getElementById('slip-container-paper').style.display='none';
+                    currentTransRef = ""; 
+                }
+                b.innerHTML = t; b.disabled = false; 
+            })
+            .catch(e => { 
+                alert('❌ Error: ' + e); 
+                b.innerHTML = t; 
+                b.disabled = false; 
+                if(contractUpdateWindow) contractUpdateWindow.close();
+            }); 
         }
-        b.innerHTML = t; b.disabled = false; 
-    })
-    .catch(e => { 
-        alert('❌ Error: ' + e); 
-        b.innerHTML = t; 
-        b.disabled = false; 
-    }); 
-}
         
         function saveAsImage() {
             const paper = document.getElementById("bill-paper"); 
@@ -674,7 +684,7 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             slipContainer.style.display = 'none';
             paper.classList.add('compact-mode'); 
 
-            html2canvas(paper, {scale: 2, backgroundColor: "#ffffff"}).then(c => {
+            html2canvas(paper, {scale: 2, backgroundColor: "#ffffff", windowWidth: 1200}).then(c => {
                 const link = document.createElement('a'); 
                 link.download = `Bill-${document.getElementById('in-book').value}-${document.getElementById('in-no').value}.jpg`;
                 link.href = c.toDataURL("image/jpeg", 0.9); 
@@ -685,7 +695,6 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             });
         }
         
-        // ตัวแปรสำหรับรวมยอดเงินจากหลายสลิป
         var totalSlipAmount = 0;
 
         function previewSlip(input) {
@@ -694,12 +703,11 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             const paperContainer = document.getElementById('slip-container-paper');
             const oldSlipSection = document.getElementById('old-slip-section');
 
-            // 🟢 รีเซ็ตค่าทุกครั้งที่เลือกไฟล์ใหม่
             previewContainer.innerHTML = '';
             paperGallery.innerHTML = '';
             currentTransRef = ""; 
-            totalSlipAmount = 0; // รีเซ็ตยอดรวม
-            document.getElementById('in-amount').value = ""; // ล้างช่องจำนวนเงินรอไว้
+            totalSlipAmount = 0; 
+            document.getElementById('in-amount').value = ""; 
             sync('amount');
 
             if (input.files && input.files.length > 0) {
@@ -748,14 +756,10 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             }
         }
         
-        // -------------------------------------------------------------
-        // ✅ FIXED: ดึงยอดจากสลิป (Auto Fill) + ตรวจเทียบงวดละ
-        // -------------------------------------------------------------
         function analyzeSlip(base64Url, index) {
             const statusEl = document.getElementById(`slip-status-${index}`);
             let verifyName = document.getElementById('in-verify-name').value;
             
-            // 🟢 ดึงค่างวด (งวดละ) มาเป็นตัวอ้างอิง (Reference)
             let remAmountRaw = document.getElementById('in-rem-amount').value;
             let expectedAmount = remAmountRaw ? parseFloat(remAmountRaw.replace(/,/g, '')) : 0;
             
@@ -782,26 +786,20 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
                     body: JSON.stringify({
                         action: 'checkSlip',
                         image: resizedBase64,
-                        expectedAmount: expectedAmount, // 🟢 ส่งค่างวดไปให้ backend ตรวจเทียบ
+                        expectedAmount: expectedAmount, 
                         verifyName: verifyName,
                         apiKey: SLIP_API_KEY 
                     })
                 })
                 .then(response => response.json())
                 .then(d => {
-                    // กรณีผ่าน หรือ กรณีผ่านแต่ยอดไม่ตรงงวด (อนุโลมให้รวมยอดได้ แต่ขึ้นเตือน)
                     if (d.status === 'valid' || d.status === 'amount-mismatch') {
-                        
-                        // 🟢 รวมยอดเงิน (Accumulate Amount)
                         if (d.actualAmount) {
                             totalSlipAmount += parseFloat(d.actualAmount);
-                            
-                            // อัปเดตช่องจำนวนเงินอัตโนมัติ
                             let amountInput = document.getElementById('in-amount');
                             amountInput.value = totalSlipAmount;
-                            formatMoney(amountInput); // จัดฟอร์แมตลูกน้ำ
+                            formatMoney(amountInput); 
                             
-                            // อัปเดตวันที่ (ใช้วันที่ของสลิปล่าสุด)
                             if (d.transDate) {
                                 const slipDate = new Date(d.transDate);
                                 const dateStr = `${slipDate.getFullYear()}-${String(slipDate.getMonth() + 1).padStart(2, '0')}-${String(slipDate.getDate()).padStart(2, '0')}`;
@@ -811,7 +809,7 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
                         }
 
                         if (d.status === 'amount-mismatch') {
-                            statusEl.className = 'slip-status status-fail'; // สีส้ม/แดงเตือน
+                            statusEl.className = 'slip-status status-fail'; 
                             statusEl.innerHTML = `⚠️ ยอด ${d.actualAmount.toLocaleString()} ไม่ตรงงวด (${expectedAmount.toLocaleString()})`;
                         } else {
                             statusEl.className = 'slip-status status-pass';
@@ -902,6 +900,13 @@ window.open(`${contractUrl}?auto_update=true&c_no=${encodeURIComponent(c_no)}`,
             // --- 🟢 ตั้งชื่อบัญชีสำหรับตรวจสลิปอัตโนมัติ (แก้ไขชื่อที่นี่) ---
             const myVerifyName = "ณัฐพล เคหาบาล,NATHAPON KEH"; 
             document.getElementById('in-verify-name').value = myVerifyName;
+            
+            // ✅ โหลดลายเซ็นจากความจำเครื่อง (ถ้ามี)
+            const savedSig = localStorage.getItem('bill_signature_img');
+            if(savedSig) {
+                document.getElementById('out-sig-img').src = savedSig;
+                document.getElementById('out-sig-img').style.display = 'block';
+            }
             // -------------------------------------------------------------
 
             const t=new Date().toISOString().split('T')[0]; document.getElementById('in-date').value=t; handleDateChange(t); generateSecurityCode(); setTimeout(fetchNextBillNo,1000);
